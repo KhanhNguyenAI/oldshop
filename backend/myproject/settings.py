@@ -42,9 +42,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'django_filters',
     'corsheaders',
     'Users',
     'Core',
+    'Products',
+    'Carts',
 ]
 
 MIDDLEWARE = [
@@ -147,13 +150,15 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PARSER_CLASSES': (
         'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser', # Enable file uploads
+        'rest_framework.parsers.FormParser',
     ),
 }
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=1),  # Test: 1 phút
-    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=5),  # Test: 5 phút
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),  # AT: 5 phút
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),  # RT: 30 ngày
     'ROTATE_REFRESH_TOKENS': True,  # Tạo RT mới mỗi lần refresh
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
@@ -201,3 +206,8 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 OTP_EXPIRY_MINUTES = 10
 OTP_LENGTH = 6
 OTP_RATE_LIMIT_PER_HOUR = 3
+
+# Supabase Settings
+SUPABASE_URL = config('SUPABASE_URL', default='https://jvxwbitigbwilbjwzthx.supabase.co')
+SUPABASE_KEY = config('SUPABASE_KEY', default='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2eHdiaXRpZ2J3aWxiand6dGh4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Mzk3NzIyNiwiZXhwIjoyMDc5NTUzMjI2fQ.Xrb0W1GARymUBx212R1Gz1IxTorL0Td4TkKA1s-f0k8')
+SUPABASE_AVATAR_BUCKET = config('SUPABASE_AVATAR_BUCKET', default='oldshop')

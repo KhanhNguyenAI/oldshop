@@ -63,6 +63,101 @@ class User(AbstractBaseUser):
         return self.is_superuser
 
 
+class UserProfile(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='profile'
+    )
+    full_name = models.CharField(max_length=255, blank=True)
+    phone_number = models.CharField(max_length=20, blank=True)
+    avatar_url = models.URLField(max_length=500, blank=True, null=True)
+    
+    class Meta:
+        db_table = 'user_profiles'
+        verbose_name = 'User Profile'
+        verbose_name_plural = 'User Profiles'
+
+    def __str__(self):
+        return f"Profile of {self.user.email}"
+
+
+class PaymentMethod(models.Model):
+    BRAND_CHOICES = [
+        ('visa', 'VISA'),
+        ('mastercard', 'Mastercard'),
+        ('jcb', 'JCB'),
+        ('amex', 'American Express'),
+        ('other', 'Other'),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='payment_methods'
+    )
+    brand = models.CharField(max_length=20, choices=BRAND_CHOICES, default='visa')
+    last4 = models.CharField(max_length=4)
+    exp_month = models.PositiveSmallIntegerField()
+    exp_year = models.PositiveSmallIntegerField()
+    card_holder_name = models.CharField(max_length=255)
+
+    # Token/id trả về từ cổng thanh toán (Stripe/Braintree/...) – không phải số thẻ
+    gateway = models.CharField(max_length=50, default='manual')  # ví dụ: 'stripe', 'braintree'
+    gateway_customer_id = models.CharField(max_length=255, blank=True)
+    gateway_payment_method_id = models.CharField(max_length=255)  # token an toàn để charge
+
+    fingerprint = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Dùng để phát hiện cùng một thẻ được thêm nhiều lần (từ gateway)."
+    )
+
+    country = models.CharField(max_length=2, blank=True)  # ISO country code
+
+    is_default = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'payment_methods'
+        verbose_name = 'Payment Method'
+        verbose_name_plural = 'Payment Methods'
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_brand_display()} •••• {self.last4} ({self.user.email})"
+
+
+class Address(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='addresses'
+    )
+    recipient = models.CharField(max_length=255)
+    postal_code = models.CharField(max_length=8)
+    prefecture = models.CharField(max_length=50)
+    city = models.CharField(max_length=255)
+    district = models.CharField(max_length=255)
+    building = models.CharField(max_length=255, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'addresses'
+        ordering = ['-is_default', '-created_at']
+
+    def __str__(self):
+        return f"{self.recipient} - {self.postal_code}"
+
+
 class RefreshToken(models.Model):
     user = models.ForeignKey(
         User,

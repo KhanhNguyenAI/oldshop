@@ -5,6 +5,7 @@ import type {
   SendOTPRequest,
   VerifyOTPRequest,
   ResetPasswordRequest,
+  ChangePasswordRequest,
   AuthResponse,
   User,
 } from '../types/auth';
@@ -55,6 +56,12 @@ export const authService = {
   // Reset password
   resetPassword: async (data: ResetPasswordRequest): Promise<{ message: string }> => {
     const response = await api.post('/auth/reset-password/', data);
+    return response.data;
+  },
+
+  // Change password (for authenticated users)
+  changePassword: async (data: ChangePasswordRequest): Promise<{ message: string }> => {
+    const response = await api.post('/auth/change-password/', data);
     return response.data;
   },
 };

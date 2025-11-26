@@ -6,9 +6,6 @@ const API_BASE_URL = '/api';
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   withCredentials: true, // Important for cookies
 });
 
@@ -57,7 +54,7 @@ api.interceptors.response.use(
     const isRefreshRequest = originalRequest.url?.includes('/auth/refresh/');
     
     // Don't retry if we're on login/register page
-    const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+    const isAuthPage = window.location.pathname === '/ReHomeMarket/login' || window.location.pathname === '/ReHomeMarket/register';
 
     // If error is 401 and we haven't tried to refresh yet
     // Skip if it's a refresh request or we're on auth pages
@@ -110,8 +107,8 @@ api.interceptors.response.use(
         
         // Redirect to login if refresh fails (but not if already on login/register page)
         const currentPath = window.location.pathname;
-        if (currentPath !== '/login' && currentPath !== '/register') {
-          window.location.href = '/login';
+        if (currentPath !== '/ReHomeMarket/login' && currentPath !== '/ReHomeMarket/register') {
+          window.location.href = '/ReHomeMarket/login';
         }
         
         return Promise.reject(refreshError);

@@ -1,8 +1,9 @@
-Django==5.2.8
-psycopg2-binary>=2.9.9
-djangorestframework==3.15.2
-djangorestframework-simplejwt==5.3.1
-django-cors-headers==4.3.1
-python-decouple==3.8
-Pillow==10.4.0
-
+Django>=5.0
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+python-decouple
+psycopg2-binary
+Pillow
+supabase
+django-filter

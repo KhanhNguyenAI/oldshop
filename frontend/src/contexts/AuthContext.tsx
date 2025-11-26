@@ -7,7 +7,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 let refreshTimer: NodeJS.Timeout | null = null;
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -19,16 +19,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     (window as any).__accessToken = token;
   }, []);
 
-  // Auto refresh token every 50 seconds (before 1 min AT expiry)
+  // Auto refresh token before AT expires (AT: 5 minutes, refresh when < 1 minute left)
   const setupAutoRefresh = useCallback(() => {
     if (refreshTimer) {
       clearInterval(refreshTimer);
     }
 
-    // Refresh every 50 seconds (50000 ms) - before AT expires at 1 min
+    // Refresh every 4 minutes (240000 ms) - before AT expires at 5 min
+    // This ensures we refresh when AT has < 1 minute left
     refreshTimer = setInterval(async () => {
       try {
-        console.log('🔄 Frontend: Auto-refresh token sau 50s...');
+        console.log('🔄 Frontend: Auto-refresh token (AT còn < 1 phút)...');
         const response = await authService.refreshToken();
         setTokenInMemory(response.access_token);
         console.log('✅ Frontend: Đã nhận AT mới');
@@ -42,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           refreshTimer = null;
         }
       }
-    }, 50 * 1000); // 50 seconds
+    }, 4 * 60 * 1000); // 4 minutes (refresh before 5 min expiry)
   }, [setTokenInMemory]);
 
   // Check if user is authenticated on mount
@@ -157,6 +158,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setTokenInMemory(response.access_token);
   };
 
+  const refreshProfile = async (): Promise<void> => {
+     try {
+       const currentUser = await authService.getCurrentUser();
+       setUser(currentUser);
+     } catch (error) {
+       console.error("Failed to refresh profile", error);
+     }
+  };
+
   const value: AuthContextType = {
     user,
     accessToken,
@@ -168,12 +178,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sendOTP,
     verifyOTP,
     refreshToken,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = (): AuthContextType => {
+const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -181,3 +192,4 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
+export { AuthProvider, useAuth };

@@ -1,10 +1,52 @@
+// User Profile Types
+export interface UserProfile {
+  id: number;
+  email: string;
+  full_name: string;
+  phone_number: string;
+  avatar_url: string | null;
+}
+
+// Payment / Card Types (VISA, Mastercard...)
+export type PaymentBrand = 'visa' | 'mastercard' | 'jcb' | 'amex' | 'other';
+
+export interface PaymentMethod {
+  id: number;
+  brand: PaymentBrand;
+  brand_display: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  card_holder_name: string;
+  gateway: string;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Address {
+  id: number;
+  recipient: string;
+  postal_code: string;
+  prefecture: string;
+  city: string;
+  district: string;
+  building: string;
+  phone: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface User {
   id: number;
   email: string;
   is_email_verified: boolean;
   created_at: string;
+  profile?: UserProfile;
 }
 
+// Auth Request Types
 export interface LoginRequest {
   email: string;
   password: string;
@@ -31,12 +73,19 @@ export interface ResetPasswordRequest {
   otp_code: string;
 }
 
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+// Auth Response Types
 export interface AuthResponse {
   message: string;
   user: User;
   access_token: string;
 }
 
+// Auth Context Type
 export interface AuthContextType {
   user: User | null;
   accessToken: string | null;
@@ -48,4 +97,5 @@ export interface AuthContextType {
   sendOTP: (email: string) => Promise<void>;
   verifyOTP: (email: string, otpCode: string) => Promise<void>;
   refreshToken: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }

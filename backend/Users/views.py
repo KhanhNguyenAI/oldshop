@@ -8,14 +8,19 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db.models import Q
-from .models import User, OTP, RefreshToken
+from .models import User, OTP, RefreshToken, UserProfile, PaymentMethod, Address
 from .serializers import (
     EmailSerializer,
     OTPSerializer,
     RegisterSerializer,
     LoginSerializer,
-    UserSerializer
+    UserSerializer,
+    UserProfileSerializer,
+    PaymentMethodSerializer,
+    AddressSerializer,
+    ChangePasswordSerializer,
 )
+from Core.utils import upload_avatar_to_supabase
 
 
 def cleanup_expired_tokens():
@@ -360,6 +365,41 @@ def get_current_user(request):
 
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """Change password for authenticated user"""
+    serializer = ChangePasswordSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    current_password = serializer.validated_data['current_password']
+    new_password = serializer.validated_data['new_password']
+    
+    # Verify current password
+    if not request.user.check_password(current_password):
+        return Response(
+            {'current_password': 'Mật khẩu hiện tại không đúng.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Update password
+    request.user.set_password(new_password)
+    request.user.save()
+    
+    # Delete all refresh tokens for security (force re-login)
+    deleted_count = RefreshToken.objects.filter(user=request.user).count()
+    RefreshToken.objects.filter(user=request.user).delete()
+    
+    print(f"🔐 CHANGE PASSWORD: User {request.user.email} | Xóa {deleted_count} RT")
+    
+    return Response(
+        {'message': 'Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại.'},
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
 @permission_classes([AllowAny])
 def reset_password(request):
     """Reset password with email and OTP verification"""
@@ -400,3 +440,130 @@ def reset_password(request):
         {'message': 'パスワードがリセットされました。'},
         status=status.HTTP_200_OK
     )
+
+
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserProfileSerializer
+
+    def get_object(self):
+        # Get or create profile for current user
+        profile, created = UserProfile.objects.get_or_create(user=self.request.user)
+        return profile
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', True)  # Default to True for PATCH requests
+        instance = self.get_object()
+        
+        # Handle Avatar Upload first (before serializer validation)
+        avatar_file = request.FILES.get('avatar')
+        avatar_url = None
+        
+        if avatar_file:
+            try:
+                avatar_url = upload_avatar_to_supabase(avatar_file, folder='avatars')
+            except Exception as e:
+                print(f"❌ Upload Error: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                return Response(
+                    {"detail": f"Avatar upload failed: {str(e)}"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Prepare data for serializer (exclude avatar from data since we handle it separately)
+        # Handle QueryDict properly (FormData creates QueryDict)
+        if hasattr(request.data, 'copy'):
+            data = request.data.copy()
+        else:
+            data = dict(request.data)
+        
+        if 'avatar' in data:
+            data.pop('avatar')  # Remove avatar from data as it's handled separately
+        
+        # If only avatar was sent, update directly without serializer validation
+        if not data and avatar_url:
+            # Only avatar update, skip serializer validation for other fields
+            instance.avatar_url = avatar_url
+            instance.save()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        
+        # Normal update with serializer validation
+        # If data is empty but no avatar, return current instance
+        if not data and not avatar_url:
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        
+        # Save with avatar_url if avatar was uploaded
+        if avatar_url:
+            serializer.save(avatar_url=avatar_url)
+        else:
+            self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+
+class PaymentMethodListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PaymentMethodSerializer
+
+    def get_queryset(self):
+        return PaymentMethod.objects.filter(user=self.request.user, is_active=True).order_by('-is_default', '-created_at')
+
+    def perform_create(self, serializer):
+        # Nếu tạo thẻ đầu tiên thì mặc định là default
+        is_first = not PaymentMethod.objects.filter(user=self.request.user, is_active=True).exists()
+        payment_method = serializer.save(user=self.request.user)
+        if is_first:
+            payment_method.is_default = True
+            payment_method.save(update_fields=['is_default'])
+
+
+class PaymentMethodDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PaymentMethodSerializer
+
+    def get_queryset(self):
+        return PaymentMethod.objects.filter(user=self.request.user, is_active=True)
+
+    def perform_destroy(self, instance):
+        # Soft delete: đánh dấu inactive thay vì xóa cứng
+        instance.is_active = False
+        instance.is_default = False
+        instance.save(update_fields=['is_active', 'is_default'])
+
+
+class AddressListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AddressSerializer
+
+    def get_queryset(self):
+        return Address.objects.filter(user=self.request.user).order_by('-is_default', '-created_at')
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class AddressDetailView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = AddressSerializer
+
+    def get_queryset(self):
+        return Address.objects.filter(user=self.request.user)
+
+    def perform_destroy(self, instance):
+        was_default = instance.is_default
+        user = instance.user
+        instance.delete()
+        if was_default:
+            next_addr = Address.objects.filter(user=user).order_by('-created_at').first()
+            if next_addr:
+                next_addr.is_default = True
+                next_addr.save(update_fields=['is_default'])

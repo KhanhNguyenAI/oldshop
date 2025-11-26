@@ -21,7 +21,9 @@ export const LoginPage: React.FC = () => {
       
       {/* Logo Container - Separate from form */}
       <div className="relative z-10 mb-10">
-        <Logo size="xl" />
+        <Link to="/" className="inline-block">
+          <Logo size="xl" />
+        </Link>
       </div>
 
       <div className="max-w-md w-full space-y-6 relative z-10">

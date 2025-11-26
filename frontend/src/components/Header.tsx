@@ -55,12 +55,20 @@ export const Header: React.FC = () => {
               {/* Auth Buttons */}
               <div className="ml-4 pl-4 border-l-2 border-amber-200 h-8 flex items-center gap-3">
                 {user ? (
-                  <button
-                    onClick={() => logout()}
-                    className="text-xs font-bold text-red-800 hover:text-red-600 font-serif uppercase tracking-widest border-b border-transparent hover:border-red-600 transition-all"
-                  >
-                    Logout
-                  </button>
+                  <div className="flex items-center gap-4">
+                    <Link
+                      to="/profile"
+                      className="text-xs font-bold text-amber-900 hover:text-amber-700 font-serif uppercase tracking-widest border-b border-transparent hover:border-amber-700 transition-all"
+                    >
+                      Profile
+                    </Link>
+                    <button
+                      onClick={() => logout()}
+                      className="text-xs font-bold text-red-800 hover:text-red-600 font-serif uppercase tracking-widest border-b border-transparent hover:border-red-600 transition-all"
+                    >
+                      Logout
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <Link
@@ -171,15 +179,24 @@ export const Header: React.FC = () => {
             ))}
             <div className="border-t border-amber-200 my-2 pt-2">
               {user ? (
-                <button
-                  onClick={() => {
-                    logout();
-                    setIsMenuOpen(false);
-                  }}
-                  className="block w-full text-left px-4 py-3 rounded-sm text-base font-bold font-serif text-red-800 hover:bg-red-50 uppercase tracking-wider"
-                >
-                  LOGOUT
-                </button>
+                <>
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="block w-full text-left px-4 py-3 rounded-sm text-base font-bold font-serif text-amber-900 hover:bg-amber-100 uppercase tracking-wider"
+                  >
+                    MY PROFILE
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-3 rounded-sm text-base font-bold font-serif text-red-800 hover:bg-red-50 uppercase tracking-wider"
+                  >
+                    LOGOUT
+                  </button>
+                </>
               ) : (
                 <div className="space-y-2 px-4">
                   <Link
