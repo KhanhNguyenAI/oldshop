@@ -23,13 +23,22 @@ export interface Product {
     title: string;
     description: string;
     price: string;
+    sale_price?: number;
+    active_discount_percent?: number;
     condition: 'new' | 'like_new' | 'good' | 'fair' | 'poor';
+    condition_detail?: string;
+    specifications?: Record<string, string>;
     location: string;
+    stock_quantity: number;
+    sold_quantity: number;
     is_sold: boolean;
     created_at: string;
     updated_at: string;
     image?: string; // Main image
     images: ProductImage[];
+    avg_rating?: number;
+    rating_count?: number;
+    user_rating?: number | null;
 }
 
 export interface CreateProductData {
@@ -50,4 +59,3 @@ export interface ProductFilters {
     condition?: string;
     ordering?: string;
 }
-

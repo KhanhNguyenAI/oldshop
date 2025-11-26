@@ -2,18 +2,20 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Logo } from './ui/Logo';
 import { useAuth } from '../contexts/AuthContext';
+import { useCart } from '../contexts/CartContext';
 
 export const Header: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { totalItems, toggleCart, cartIconRef } = useCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navItems = [
-    { label: 'HOME', path: '/' },
-    { label: 'SHOP', path: '/shop' },
-    { label: 'BOOKING', path: '/booking' },
-    { label: 'ABOUT', path: '/about' },
-    { label: 'CONTACT', path: '/contact' },
+    { label: 'ホーム', path: '/' },
+    { label: '商品一覧', path: '/shop' },
+    { label: '予約', path: '/booking' },
+    { label: '概要', path: '/about' },
+    { label: 'お問い合わせ', path: '/contact' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -51,22 +53,37 @@ export const Header: React.FC = () => {
                   {item.label}
                 </Link>
               ))}
+
+              {/* Cart Button */}
+              <button
+                ref={cartIconRef}
+                onClick={toggleCart}
+                className="relative p-2 ml-2 text-amber-900 hover:text-amber-700 transition-colors"
+                aria-label="Cart"
+              >
+                <span className="text-2xl">🛒</span>
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-amber-50">
+                    {totalItems}
+                  </span>
+                )}
+              </button>
               
               {/* Auth Buttons */}
-              <div className="ml-4 pl-4 border-l-2 border-amber-200 h-8 flex items-center gap-3">
+              <div className="ml-2 pl-4 border-l-2 border-amber-200 h-8 flex items-center gap-3">
                 {user ? (
                   <div className="flex items-center gap-4">
                     <Link
                       to="/profile"
                       className="text-xs font-bold text-amber-900 hover:text-amber-700 font-serif uppercase tracking-widest border-b border-transparent hover:border-amber-700 transition-all"
                     >
-                      Profile
+                      プロフィール
                     </Link>
                     <button
                       onClick={() => logout()}
                       className="text-xs font-bold text-red-800 hover:text-red-600 font-serif uppercase tracking-widest border-b border-transparent hover:border-red-600 transition-all"
                     >
-                      Logout
+                      ログアウト
                     </button>
                   </div>
                 ) : (
@@ -75,13 +92,13 @@ export const Header: React.FC = () => {
                       to="/login"
                       className="text-xs font-bold text-amber-900 hover:text-amber-700 font-serif uppercase tracking-widest border-b border-transparent hover:border-amber-700 transition-all"
                     >
-                      Login
+                      ログイン
                     </Link>
                     <Link
                       to="/register"
                       className="px-3 py-1 bg-amber-800 text-amber-50 text-xs font-bold font-serif uppercase tracking-widest rounded-sm shadow-sm hover:bg-amber-700 transition-all"
                     >
-                      Register
+                      新規登録
                     </Link>
                   </>
                 )}
@@ -89,7 +106,20 @@ export const Header: React.FC = () => {
             </div>
 
             {/* Mobile menu button */}
-            <div className="md:hidden flex items-center">
+            <div className="md:hidden flex items-center gap-4">
+              {/* Cart Button Mobile */}
+              <button
+                onClick={toggleCart}
+                className="relative p-2 text-amber-900"
+              >
+                <span className="text-2xl">🛒</span>
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-amber-50">
+                    {totalItems}
+                  </span>
+                )}
+              </button>
+
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="inline-flex items-center justify-center p-2 rounded-md text-amber-900 hover:text-amber-700 hover:bg-amber-100 focus:outline-none border-2 border-amber-900 shadow-sm"
@@ -185,7 +215,7 @@ export const Header: React.FC = () => {
                     onClick={() => setIsMenuOpen(false)}
                     className="block w-full text-left px-4 py-3 rounded-sm text-base font-bold font-serif text-amber-900 hover:bg-amber-100 uppercase tracking-wider"
                   >
-                    MY PROFILE
+                    マイページ
                   </Link>
                   <button
                     onClick={() => {
@@ -194,7 +224,7 @@ export const Header: React.FC = () => {
                     }}
                     className="block w-full text-left px-4 py-3 rounded-sm text-base font-bold font-serif text-red-800 hover:bg-red-50 uppercase tracking-wider"
                   >
-                    LOGOUT
+                    ログアウト
                   </button>
                 </>
               ) : (
@@ -204,14 +234,14 @@ export const Header: React.FC = () => {
                     onClick={() => setIsMenuOpen(false)}
                     className="block w-full text-center py-2 text-amber-900 font-bold font-serif border-2 border-amber-900 rounded-sm hover:bg-amber-100 uppercase tracking-wider"
                   >
-                    Login
+                    ログイン
                   </Link>
                   <Link
                     to="/register"
                     onClick={() => setIsMenuOpen(false)}
                     className="block w-full text-center py-2 bg-amber-800 text-amber-50 font-bold font-serif rounded-sm shadow-sm hover:bg-amber-700 uppercase tracking-wider"
                   >
-                    Register
+                    新規登録
                   </Link>
                 </div>
               )}

@@ -26,7 +26,7 @@ export const HomePage: React.FC = () => {
            </p>
            <div className="inline-block p-2 border-t-2 border-b-2 border-amber-800 mb-12">
              <span className="text-amber-900 font-bold tracking-[0.3em] uppercase text-sm">
-               Est. 2025 • Tokyo, Japan
+               創業 2025年 • 東京, 日本
              </span>
            </div>
 
@@ -37,13 +37,13 @@ export const HomePage: React.FC = () => {
                  to="/shop"
                  className="px-8 py-3 bg-amber-800 text-amber-50 font-bold font-serif uppercase tracking-widest rounded-sm shadow-[4px_4px_0px_0px_rgba(69,26,3,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(69,26,3,1)] transition-all"
                >
-                 SHOP NOW
+                 お買い物へ
                </Link>
                <Link
                  to="/register"
                  className="px-8 py-3 bg-amber-100 text-amber-900 border-2 border-amber-800 font-bold font-serif uppercase tracking-widest rounded-sm shadow-[4px_4px_0px_0px_rgba(120,53,15,0.5)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(120,53,15,0.5)] transition-all"
                >
-                 JOIN US
+                 会員登録
                </Link>
              </div>
            )}
@@ -60,29 +60,29 @@ export const HomePage: React.FC = () => {
               <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-amber-700"></div>
               
               <h2 className="text-2xl font-bold text-amber-900 mb-6 font-serif border-b-4 border-amber-800 inline-block pb-2">
-                👋 Welcome back, {user.email.split('@')[0]}
+                👋 おかえりなさい, {user.email.split('@')[0]}
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Email Card */}
                 <div className="bg-amber-100 border-2 border-amber-700 rounded-sm p-4 shadow-sm">
-                  <p className="text-xs text-amber-800 font-bold uppercase tracking-wider font-serif mb-2">ACCOUNT</p>
+                  <p className="text-xs text-amber-800 font-bold uppercase tracking-wider font-serif mb-2">アカウント</p>
                   <p className="text-lg font-mono text-amber-900 truncate">{user.email}</p>
                 </div>
 
                 {/* Status Card */}
                 <div className="bg-amber-100 border-2 border-amber-700 rounded-sm p-4 shadow-sm">
-                  <p className="text-xs text-amber-800 font-bold uppercase tracking-wider font-serif mb-2">STATUS</p>
+                  <p className="text-xs text-amber-800 font-bold uppercase tracking-wider font-serif mb-2">ステータス</p>
                   <p className="text-lg font-serif text-amber-900">
-                    {user.is_email_verified ? '✅ Verified' : '❌ Unverified'}
+                    {user.is_email_verified ? '✅ 認証済み' : '❌ 未認証'}
                   </p>
                 </div>
 
                 {/* Member Since Card */}
                 <div className="bg-amber-100 border-2 border-amber-700 rounded-sm p-4 shadow-sm">
-                  <p className="text-xs text-amber-800 font-bold uppercase tracking-wider font-serif mb-2">MEMBER SINCE</p>
+                  <p className="text-xs text-amber-800 font-bold uppercase tracking-wider font-serif mb-2">登録年</p>
                   <p className="text-lg font-serif text-amber-900">
-                    {new Date(user.created_at).getFullYear()}
+                    {new Date(user.created_at).getFullYear()}年
                   </p>
                 </div>
               </div>
@@ -94,7 +94,7 @@ export const HomePage: React.FC = () => {
           {/* Section Title */}
           <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-amber-100 font-serif inline-block border-b-2 border-amber-500 pb-1">
-              📍 FIND US
+              📍 店舗へのアクセス
             </h2>
           </div>
 

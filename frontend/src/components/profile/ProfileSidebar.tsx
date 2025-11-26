@@ -1,7 +1,7 @@
 import React from 'react';
 import type { User } from '../../types/auth';
 
-export type ProfileTab = 'profile' | 'banking' | 'address' | 'security' | 'orders';
+export type ProfileTab = 'profile' | 'banking' | 'address' | 'security' | 'orders' | 'coupons';
 
 interface ProfileSidebarProps {
   user: User | null;
@@ -39,6 +39,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
             { id: 'profile', label: 'プロフィール', icon: '👤' },
             { id: 'banking', label: '決済方法', icon: '💳' },
             { id: 'address', label: '住所', icon: '📍' },
+            { id: 'coupons', label: 'クーポン', icon: '🎟️' },
             { id: 'security', label: 'パスワード変更', icon: '🔒' },
             { id: 'orders', label: '購入履歴', icon: '🛍️' },
           ].map((item) => (

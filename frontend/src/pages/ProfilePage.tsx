@@ -7,6 +7,7 @@ import { BankingPanel } from '../components/profile/BankingPanel';
 import { AddressPanel } from '../components/profile/AddressPanel';
 import { SecurityPanel } from '../components/profile/SecurityPanel';
 import { OrdersPanel } from '../components/profile/OrdersPanel';
+import CouponsPanel from '../components/profile/CouponsPanel';
 
 export const ProfilePage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -24,6 +25,8 @@ export const ProfilePage: React.FC = () => {
         return <SecurityPanel />;
       case 'orders':
         return <OrdersPanel />;
+      case 'coupons':
+        return <CouponsPanel />;
       default:
         return null;
     }

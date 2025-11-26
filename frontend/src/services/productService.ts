@@ -1,5 +1,6 @@
 import api from './api';
 import type { Product, Category, CreateProductData, ProductFilters } from '../types/product';
+import type { Comment } from '../types/comment';
 
 export const productService = {
     getCategories: async (): Promise<Category[]> => {
@@ -15,10 +16,10 @@ export const productService = {
         if (filters.ordering) params.append('ordering', filters.ordering);
         
         const response = await api.get(`/products/products/?${params.toString()}`);
-        return response.data; // DRF default pagination might return { results: [], ... } so we might need to adjust this depending on settings. Assuming default list for now or handling it.
+        return response.data;
     },
 
-    getProduct: async (id: number): Promise<Product> => {
+    getProduct: async (id: string): Promise<Product> => {
         const response = await api.get(`/products/products/${id}/`);
         return response.data;
     },
@@ -45,5 +46,21 @@ export const productService = {
         });
         return response.data;
     },
-};
 
+    rateProduct: async (id: string, score: number): Promise<void> => {
+        await api.post(`/products/products/${id}/rate/`, { score });
+    },
+
+    getComments: async (id: string): Promise<Comment[]> => {
+        const response = await api.get(`/products/products/${id}/comments/`);
+        return response.data;
+    },
+
+    addComment: async (id: string, content: string, parentId?: number): Promise<Comment> => {
+        const response = await api.post(`/products/products/${id}/add_comment/`, { 
+            content, 
+            parent_id: parentId 
+        });
+        return response.data;
+    }
+};
