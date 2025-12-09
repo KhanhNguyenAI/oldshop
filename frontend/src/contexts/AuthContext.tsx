@@ -28,14 +28,33 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     // Refresh every 4 minutes (240000 ms) - before AT expires at 5 min
     // This ensures we refresh when AT has < 1 minute left
     refreshTimer = setInterval(async () => {
+      // Don't try to refresh if backend is marked as down
+      if ((window as any).__backendDown) {
+        console.warn('⚠️ Frontend: Backend không khả dụng, bỏ qua auto-refresh');
+        return;
+      }
+
       try {
         console.log('🔄 Frontend: Auto-refresh token (AT còn < 1 phút)...');
         const response = await authService.refreshToken();
         setTokenInMemory(response.access_token);
         console.log('✅ Frontend: Đã nhận AT mới');
-      } catch (error) {
+        // Backend is up, clear the flag
+        (window as any).__backendDown = false;
+      } catch (error: any) {
+        // If it's a network error, mark backend as down and stop retrying
+        if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED') || !error.response) {
+          console.error('❌ Frontend: Backend không khả dụng, dừng auto-refresh');
+          (window as any).__backendDown = true;
+          if (refreshTimer) {
+            clearInterval(refreshTimer);
+            refreshTimer = null;
+          }
+          return;
+        }
+        
         console.error('❌ Frontend: Auto refresh failed:', error);
-        // If refresh fails, clear everything
+        // If refresh fails for other reasons, clear everything
         setUser(null);
         setTokenInMemory(null);
         if (refreshTimer) {
@@ -61,9 +80,21 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       }
       
       try {
+        // Don't try to refresh if backend is marked as down
+        if ((window as any).__backendDown) {
+          console.warn('⚠️ Frontend: Backend không khả dụng, bỏ qua check auth');
+          if (isMounted) {
+            setIsLoading(false);
+          }
+          return;
+        }
+
         // Try to refresh token to get new access token
         // This will fail silently if no refresh token exists
         const response = await authService.refreshToken();
+        
+        // Backend is up, clear the flag
+        (window as any).__backendDown = false;
         
         if (isMounted) {
           setTokenInMemory(response.access_token);
@@ -83,12 +114,22 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             }
           }
         }
-      } catch (error) {
-        // If refresh fails (no refresh token or expired), user is not authenticated
-        // This is normal for users who haven't logged in yet - just silently fail
-        if (isMounted) {
-          setUser(null);
-          setTokenInMemory(null);
+      } catch (error: any) {
+        // If it's a network error, mark backend as down
+        if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED') || !error.response) {
+          console.warn('⚠️ Frontend: Backend không khả dụng');
+          (window as any).__backendDown = true;
+          if (isMounted) {
+            setUser(null);
+            setTokenInMemory(null);
+          }
+        } else {
+          // If refresh fails (no refresh token or expired), user is not authenticated
+          // This is normal for users who haven't logged in yet - just silently fail
+          if (isMounted) {
+            setUser(null);
+            setTokenInMemory(null);
+          }
         }
       } finally {
         if (isMounted) {

@@ -34,6 +34,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
 
     try {
       await login(data.email, data.password);
+      // onSuccess will be called after login, which will handle redirect
       onSuccess?.();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { email?: string[]; password?: string[]; error?: string } } };

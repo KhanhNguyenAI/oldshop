@@ -251,6 +251,64 @@ class ChangePasswordSerializer(serializers.Serializer):
         return attrs
 
 
+class UpdateEmailSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_email = serializers.EmailField(validators=[EmailValidator()])
+    otp_code = serializers.CharField(max_length=6, min_length=6, write_only=True)
+
+    def validate_new_email(self, value):
+        # Check if new email is different from current email
+        request = self.context.get('request')
+        if request and request.user:
+            if value.lower() == request.user.email.lower():
+                raise serializers.ValidationError("Email mới phải khác email hiện tại.")
+        
+        # Check if email already exists
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email đã được sử dụng.")
+        return value
+
+    def validate_otp_code(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("OTP phải là 6 chữ số.")
+        return value
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if not request or not request.user:
+            raise serializers.ValidationError("Người dùng không được xác thực.")
+        
+        current_password = attrs.get('current_password')
+        new_email = attrs.get('new_email')
+        otp_code = attrs.get('otp_code')
+
+        # Verify current password
+        if not request.user.check_password(current_password):
+            raise serializers.ValidationError({
+                'current_password': 'Mật khẩu hiện tại không đúng.'
+            })
+
+        # Verify OTP for new email
+        otp_obj = OTP.objects.filter(
+            email=new_email,
+            is_used=False,
+            expires_at__gt=timezone.now()
+        ).order_by('-created_at').first()
+
+        if not otp_obj:
+            raise serializers.ValidationError({
+                'otp_code': 'OTP không hợp lệ hoặc đã hết hạn.'
+            })
+
+        if not otp_obj.verify_otp(otp_code):
+            raise serializers.ValidationError({
+                'otp_code': 'OTP không đúng.'
+            })
+
+        attrs['otp_obj'] = otp_obj
+        return attrs
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
     avatar = serializers.ImageField(write_only=True, required=False)
@@ -266,7 +324,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'is_email_verified', 'created_at', 'profile']
+        fields = ['id', 'email', 'is_email_verified', 'is_staff', 'is_superuser', 'created_at', 'profile']
         read_only_fields = ['id', 'email', 'is_email_verified', 'created_at']
 
 

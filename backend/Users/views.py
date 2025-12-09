@@ -19,6 +19,7 @@ from .serializers import (
     PaymentMethodSerializer,
     AddressSerializer,
     ChangePasswordSerializer,
+    UpdateEmailSerializer,
 )
 from Core.utils import upload_avatar_to_supabase
 
@@ -395,6 +396,113 @@ def change_password(request):
     
     return Response(
         {'message': 'Mật khẩu đã được thay đổi thành công. Vui lòng đăng nhập lại.'},
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_otp_for_email_update(request):
+    """Send OTP to new email for email update"""
+    serializer = EmailSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    new_email = serializer.validated_data['email']
+    
+    # Check if new email is different from current email
+    if new_email.lower() == request.user.email.lower():
+        return Response(
+            {'email': 'Email mới phải khác email hiện tại.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Check if email already exists
+    if User.objects.filter(email=new_email).exists():
+        return Response(
+            {'email': 'Email đã được sử dụng.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Rate limiting: Check if too many OTP requests in last hour
+    one_hour_ago = timezone.now() - timedelta(hours=1)
+    recent_otps = OTP.objects.filter(
+        email=new_email,
+        created_at__gte=one_hour_ago
+    ).count()
+    
+    if recent_otps >= settings.OTP_RATE_LIMIT_PER_HOUR:
+        return Response(
+            {'error': f'Bạn đã gửi quá nhiều yêu cầu OTP. Vui lòng thử lại sau.'},
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
+    
+    # Generate OTP
+    otp_code = OTP.generate_otp(length=settings.OTP_LENGTH)
+    otp_hash = OTP.hash_otp(otp_code)
+    
+    # Set expiry
+    expires_at = timezone.now() + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
+    
+    # Save OTP
+    OTP.objects.create(
+        email=new_email,
+        otp_code_hash=otp_hash,
+        expires_at=expires_at
+    )
+    
+    # Print OTP to console for development (remove in production)
+    print(f"\n{'='*50}")
+    print(f"OTP CODE FOR EMAIL UPDATE {new_email}: {otp_code}")
+    print(f"Expires at: {expires_at}")
+    print(f"{'='*50}\n")
+    
+    # Send email
+    if send_otp_email(new_email, otp_code):
+        return Response(
+            {'message': 'OTP đã được gửi đến email mới của bạn.'},
+            status=status.HTTP_200_OK
+        )
+    else:
+        return Response(
+            {'error': 'Không thể gửi email. Vui lòng thử lại.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_email(request):
+    """Update email with password and OTP verification"""
+    serializer = UpdateEmailSerializer(data=request.data, context={'request': request})
+    
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    new_email = serializer.validated_data['new_email']
+    otp_obj = serializer.validated_data['otp_obj']
+    old_email = request.user.email
+    
+    # Update email
+    request.user.email = new_email
+    request.user.is_email_verified = True  # Email is verified via OTP
+    request.user.save()
+    
+    # Mark OTP as used
+    otp_obj.mark_as_used()
+    
+    # Delete all refresh tokens for security (force re-login with new email)
+    deleted_count = RefreshToken.objects.filter(user=request.user).count()
+    RefreshToken.objects.filter(user=request.user).delete()
+    
+    print(f"📧 UPDATE EMAIL: User {old_email} -> {new_email} | Xóa {deleted_count} RT")
+    
+    return Response(
+        {
+            'message': 'Email đã được cập nhật thành công. Vui lòng đăng nhập lại với email mới.',
+            'new_email': new_email
+        },
         status=status.HTTP_200_OK
     )
 

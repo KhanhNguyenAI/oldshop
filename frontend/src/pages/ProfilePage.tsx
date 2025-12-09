@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { useAuth } from '../contexts/AuthContext';
 import { ProfileSidebar, type ProfileTab } from '../components/profile/ProfileSidebar';
@@ -7,11 +8,28 @@ import { BankingPanel } from '../components/profile/BankingPanel';
 import { AddressPanel } from '../components/profile/AddressPanel';
 import { SecurityPanel } from '../components/profile/SecurityPanel';
 import { OrdersPanel } from '../components/profile/OrdersPanel';
+import { ReturnsPanel } from '../components/profile/ReturnsPanel';
 import CouponsPanel from '../components/profile/CouponsPanel';
+import { BookingsPanel } from '../components/profile/BookingsPanel';
 
 export const ProfilePage: React.FC = () => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState<ProfileTab>('profile');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as ProfileTab | null;
+  const [activeTab, setActiveTab] = useState<ProfileTab>(tabParam || 'profile');
+
+  // Update activeTab when tab query parameter changes
+  useEffect(() => {
+    if (tabParam && ['profile', 'banking', 'address', 'security', 'orders', 'returns', 'coupons', 'bookings'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  // Update URL when activeTab changes (but don't override if coming from URL)
+  const handleTabChange = (tab: ProfileTab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -25,8 +43,12 @@ export const ProfilePage: React.FC = () => {
         return <SecurityPanel />;
       case 'orders':
         return <OrdersPanel />;
+      case 'returns':
+        return <ReturnsPanel />;
       case 'coupons':
         return <CouponsPanel />;
+      case 'bookings':
+        return <BookingsPanel />;
       default:
         return null;
     }
@@ -42,7 +64,7 @@ export const ProfilePage: React.FC = () => {
         </h1>
 
         <div className="flex flex-col md:flex-row gap-8">
-          <ProfileSidebar user={user} activeTab={activeTab} onChangeTab={setActiveTab} onLogout={logout} />
+          <ProfileSidebar user={user} activeTab={activeTab} onChangeTab={handleTabChange} onLogout={logout} />
 
           {/* Main Content Area */}
           <div className="flex-1">

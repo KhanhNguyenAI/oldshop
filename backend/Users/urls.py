@@ -13,6 +13,8 @@ urlpatterns = [
     path('me/', views.get_current_user, name='current-user'),
     path('reset-password/', views.reset_password, name='reset-password'),
     path('change-password/', views.change_password, name='change-password'),
+    path('send-otp-email-update/', views.send_otp_for_email_update, name='send-otp-email-update'),
+    path('update-email/', views.update_email, name='update-email'),
     path('profile/', views.UserProfileView.as_view(), name='user-profile'),
     # Payment methods (VISA / cards)
     path('payments/', views.PaymentMethodListCreateView.as_view(), name='payment-method-list-create'),

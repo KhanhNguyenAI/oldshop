@@ -46,7 +46,11 @@ const processQueue = (error: Error | null, token: string | null = null) => {
 };
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // If we get a successful response, backend is up - clear the flag
+    (window as any).__backendDown = false;
+    return response;
+  },
   async (error: any) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -55,6 +59,18 @@ api.interceptors.response.use(
     
     // Don't retry if we're on login/register page
     const isAuthPage = window.location.pathname === '/ReHomeMarket/login' || window.location.pathname === '/ReHomeMarket/register';
+
+    // Handle network errors (backend not running) - don't retry
+    if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED') || !error.response) {
+      // If it's a refresh request and backend is down, clear token and stop
+      if (isRefreshRequest) {
+        (window as any).__accessToken = null;
+        (window as any).__backendDown = true; // Flag to prevent further refresh attempts
+        return Promise.reject(error);
+      }
+      // For other requests, just reject without retry
+      return Promise.reject(error);
+    }
 
     // If error is 401 and we haven't tried to refresh yet
     // Skip if it's a refresh request or we're on auth pages
@@ -79,12 +95,20 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
+        // Check if backend was previously down - if so, don't retry
+        if ((window as any).__backendDown) {
+          throw new Error('Backend is not available');
+        }
+
         // Try to refresh token
         const refreshResponse = await axios.post(
           `${API_BASE_URL}/auth/refresh/`,
           {},
           { withCredentials: true }
         );
+
+        // Backend is up, clear the flag
+        (window as any).__backendDown = false;
 
         const { access_token } = refreshResponse.data;
         
@@ -99,8 +123,13 @@ api.interceptors.response.use(
         processQueue(null, access_token);
 
         return api(originalRequest);
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         processQueue(refreshError as Error, null);
+        
+        // If it's a network error, mark backend as down
+        if (refreshError.code === 'ECONNREFUSED' || refreshError.message?.includes('ECONNREFUSED') || !refreshError.response) {
+          (window as any).__backendDown = true;
+        }
         
         // Clear access token
         (window as any).__accessToken = null;

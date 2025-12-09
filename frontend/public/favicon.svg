@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <style>
+      .house { fill: #92400e; }
+      .text { fill: #fffbeb; font-family: serif; font-weight: bold; }
+      .accent { fill: #fde68a; }
+      .shadow { fill: #451a03; opacity: 0.2; }
+    </style>
+  </defs>
+  
+  <!-- Shadow -->
+  <path class="shadow" d="M60 250 L256 70 L452 250 L420 250 L420 460 L92 460 L92 250 Z" transform="translate(15, 15)"/>
+  
+  <!-- Main House Shape -->
+  <path class="house" d="M60 250 L256 70 L452 250 L420 250 L420 460 L92 460 L92 250 Z"/>
+  
+  <!-- Roof Details (Snow/Accent) -->
+  <path class="accent" d="M256 70 L60 250 L90 250 L256 95 L422 250 L452 250 Z" opacity="0.3"/>
+  
+  <!-- RH Text -->
+  <text x="50%" y="62%" class="text" font-size="200" text-anchor="middle" dy=".3em">RH</text>
+  
+  <!-- Recycle Arrows / Circle (Subtle) -->
+  <path class="accent" d="M256 380 A 100 100 0 0 1 180 340" stroke="#fde68a" stroke-width="20" fill="none" stroke-linecap="round" opacity="0.5"/>
+  <path class="accent" d="M256 380 A 100 100 0 0 0 332 340" stroke="#fde68a" stroke-width="20" fill="none" stroke-linecap="round" opacity="0.5"/>
+</svg>

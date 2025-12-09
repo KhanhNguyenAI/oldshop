@@ -1,22 +1,34 @@
 import api from './api';
-import type { Product, Category, CreateProductData, ProductFilters } from '../types/product';
+import type { Product, Category, CreateProductData, ProductFilters, PaginatedResponse } from '../types/product';
 import type { Comment } from '../types/comment';
 
 export const productService = {
     getCategories: async (): Promise<Category[]> => {
         const response = await api.get('/products/categories/');
-        return response.data;
+        // Handle paginated response (has 'results' field) or direct array
+        return response.data.results || response.data;
     },
 
-    getProducts: async (filters: ProductFilters = {}): Promise<Product[]> => {
+    getProducts: async (filters: ProductFilters = {}, page: number = 1): Promise<PaginatedResponse<Product>> => {
         const params = new URLSearchParams();
         if (filters.category) params.append('category', filters.category);
         if (filters.search) params.append('search', filters.search);
         if (filters.condition) params.append('condition', filters.condition);
         if (filters.ordering) params.append('ordering', filters.ordering);
+        if (page > 1) params.append('page', page.toString());
         
         const response = await api.get(`/products/products/?${params.toString()}`);
-        return response.data;
+        // Handle paginated response (has 'results' field) or direct array (fallback)
+        if (response.data.results) {
+            return response.data;
+        }
+        // Fallback: if not paginated, wrap in paginated format
+        return {
+            count: Array.isArray(response.data) ? response.data.length : 0,
+            next: null,
+            previous: null,
+            results: Array.isArray(response.data) ? response.data : []
+        };
     },
 
     getProduct: async (id: string): Promise<Product> => {
@@ -56,11 +68,37 @@ export const productService = {
         return response.data;
     },
 
-    addComment: async (id: string, content: string, parentId?: number): Promise<Comment> => {
-        const response = await api.post(`/products/products/${id}/add_comment/`, { 
-            content, 
-            parent_id: parentId 
+    addComment: async (id: string, content: string, parentId?: number, images?: File[]): Promise<Comment> => {
+        const formData = new FormData();
+        formData.append('content', content);
+        if (parentId) formData.append('parent_id', parentId.toString());
+        
+        if (images) {
+            images.forEach(image => {
+                formData.append('uploaded_images', image);
+            });
+        }
+
+        const response = await api.post(`/products/products/${id}/add_comment/`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
         });
+        return response.data;
+    },
+
+    getRecommendations: async (id: string): Promise<{ type: 'same_category' | 'accessories'; category: Category; recommendations: Product[]; count: number }> => {
+        const response = await api.get(`/products/products/${id}/recommendations/`);
+        return response.data;
+    },
+
+    getAccessories: async (): Promise<{ purchased_count: number; accessories: Product[]; count: number }> => {
+        const response = await api.get('/products/products/accessories/');
+        return response.data;
+    },
+
+    getRobotSuggestions: async (): Promise<{ products: Product[]; count: number; type: 'viewed' | 'bestselling' }> => {
+        const response = await api.get('/products/products/robot_suggestions/');
         return response.data;
     }
 };

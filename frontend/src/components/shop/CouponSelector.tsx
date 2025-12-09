@@ -16,10 +16,13 @@ export const CouponSelector: React.FC<CouponSelectorProps> = ({ onSelect, onCanc
         const loadCoupons = async () => {
             try {
                 const data = await couponService.list();
-                setCoupons(data);
+                // Handle both array and paginated response
+                const couponsArray = Array.isArray(data) ? data : (data.results || []);
+                setCoupons(couponsArray);
             } catch (error) {
                 console.error(error);
                 toast.error('クーポンの読み込みに失敗しました');
+                setCoupons([]); // Set empty array on error
             } finally {
                 setLoading(false);
             }
@@ -29,7 +32,7 @@ export const CouponSelector: React.FC<CouponSelectorProps> = ({ onSelect, onCanc
 
     if (loading) return <div className="text-sm text-stone-500 p-2">Loading...</div>;
 
-    if (coupons.length === 0) {
+    if (!Array.isArray(coupons) || coupons.length === 0) {
         return (
             <div className="p-3 bg-white border border-stone-200 rounded-md text-center text-sm text-stone-500">
                 利用可能なクーポンはありません
@@ -57,7 +60,11 @@ export const CouponSelector: React.FC<CouponSelectorProps> = ({ onSelect, onCanc
                         </div>
                         <p className="text-xs text-stone-500 mt-1 line-clamp-1 group-hover:text-stone-700">{coupon.description}</p>
                         {coupon.min_order_value !== '0.00' && (
-                             <p className="text-[10px] text-stone-400 mt-0.5">最低注文額: ¥{parseInt(coupon.min_order_value).toLocaleString()}</p>
+                             <div className="mt-1 flex items-center gap-1">
+                                 <span className="text-[10px] px-1 py-0.5 bg-stone-100 text-stone-600 rounded border border-stone-200">
+                                     ¥{parseInt(coupon.min_order_value).toLocaleString()} 以上購入で
+                                 </span>
+                             </div>
                         )}
                     </button>
                 ))}

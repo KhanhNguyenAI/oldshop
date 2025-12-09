@@ -8,9 +8,14 @@ import { ShopPage } from './pages/ShopPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { AboutPage } from './pages/AboutPage';
 import { ContactPage } from './pages/ContactPage';
+import { ReturnPolicyPage } from './pages/ReturnPolicyPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderSuccessPage } from './pages/OrderSuccessPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { BookingPage } from './pages/BookingPage';
+import { BuybackPricePage } from './pages/BuybackPricePage';
+import { AdminPage } from './pages/AdminPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PageLoader } from './components/ui/PageLoader';
 import { Footer } from './components/Footer';
@@ -34,9 +39,12 @@ const AppContent = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/" element={<HomePage />} />
           <Route path="/shop" element={<ShopPage />} />
-      <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/booking" element={<BookingPage />} />
+          <Route path="/buyback-price" element={<BuybackPricePage />} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/return-policy" element={<ReturnPolicyPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/order-success" element={<OrderSuccessPage />} />
           <Route 
@@ -47,6 +55,15 @@ const AppContent = () => {
               </ProtectedRoute>
             } 
           />
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute>
+                <AdminPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </div>
       <Footer />
@@ -56,7 +73,7 @@ const AppContent = () => {
 
 function App() {
   return (
-    <BrowserRouter basename="/ReHomeMarket">
+    <BrowserRouter basename="/ReHomeMarket/">
       <AuthProvider>
         <CartProvider>
           <AppContent />

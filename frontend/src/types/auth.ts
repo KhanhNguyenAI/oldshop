@@ -42,6 +42,8 @@ export interface User {
   id: number;
   email: string;
   is_email_verified: boolean;
+  is_staff?: boolean;
+  is_superuser?: boolean;
   created_at: string;
   profile?: UserProfile;
 }
@@ -76,6 +78,16 @@ export interface ResetPasswordRequest {
 export interface ChangePasswordRequest {
   current_password: string;
   new_password: string;
+}
+
+export interface SendOTPForEmailUpdateRequest {
+  email: string;
+}
+
+export interface UpdateEmailRequest {
+  current_password: string;
+  new_email: string;
+  otp_code: string;
 }
 
 // Auth Response Types

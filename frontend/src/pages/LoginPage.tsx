@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { LoginForm } from '../components/LoginForm';
 import { ResetPasswordForm } from '../components/ResetPasswordForm';
@@ -7,12 +7,19 @@ import { Logo } from '../components/ui/Logo';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [showResetPassword, setShowResetPassword] = useState(false);
 
-  if (isAuthenticated) {
-    navigate('/');
-  }
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Redirect staff/superuser to admin page
+      if (user.is_staff || user.is_superuser) {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [isAuthenticated, user, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-100 via-orange-50 to-yellow-100 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
@@ -53,7 +60,9 @@ export const LoginPage: React.FC = () => {
           
           {!showResetPassword ? (
             <>
-              <LoginForm onSuccess={() => navigate('/')} />
+              <LoginForm onSuccess={() => {
+                // Redirect will be handled by useEffect based on user role
+              }} />
               <div className="mt-6 space-y-4 text-center border-t-2 border-dashed border-amber-200 pt-4">
                 <div>
                   <button

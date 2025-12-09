@@ -6,10 +6,12 @@ import type { Order } from '../../types/order';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { useCart } from '../../contexts/CartContext';
+import { ReturnRequestForm } from '../return/ReturnRequestForm';
 
 export const OrdersPanel: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
   const { addToCart } = useCart();
   const navigate = useNavigate();
 
@@ -17,9 +19,12 @@ export const OrdersPanel: React.FC = () => {
     const fetchOrders = async () => {
       try {
         const data = await orderService.list();
-        setOrders(data);
+        // Handle both array and paginated response
+        const ordersArray = Array.isArray(data) ? data : (data.results || []);
+        setOrders(ordersArray);
       } catch (error) {
         console.error('Failed to fetch orders:', error);
+        setOrders([]); // Set empty array on error
       } finally {
         setLoading(false);
       }
@@ -166,13 +171,38 @@ export const OrdersPanel: React.FC = () => {
       );
   };
 
+  if (returnOrderId) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <button
+          onClick={() => setReturnOrderId(null)}
+          className="text-amber-600 hover:text-amber-800 font-medium flex items-center gap-2 mb-4"
+        >
+          ← 戻る
+        </button>
+        <ReturnRequestForm
+          orderId={returnOrderId}
+          onSuccess={() => {
+            setReturnOrderId(null);
+            // Refresh orders
+            orderService.list().then(data => {
+              const ordersArray = Array.isArray(data) ? data : (data.results || []);
+              setOrders(ordersArray);
+            }).catch(console.error);
+          }}
+          onCancel={() => setReturnOrderId(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fadeIn">
       <h3 className="text-2xl font-serif font-bold text-amber-900 border-b-2 border-amber-200 pb-2">
         購入履歴
       </h3>
 
-      {orders.length === 0 ? (
+      {!Array.isArray(orders) || orders.length === 0 ? (
         <div className="text-center py-12 bg-stone-50 rounded-xl border border-stone-100">
             <span className="text-4xl block mb-4">📦</span>
             <p className="text-stone-500 font-serif">注文履歴がありません。</p>
@@ -248,7 +278,23 @@ export const OrdersPanel: React.FC = () => {
                     
                     <div className="bg-stone-50 px-6 py-3 border-t border-stone-200 flex justify-between items-center">
                         <div className="text-xs text-stone-500">
-                            お支払い方法: {order.payment_method === 'cod' ? '代金引換' : order.payment_method === 'credit_card' ? 'クレジットカード' : '銀行振込'}
+                            <div>
+                                お支払い方法: {order.payment_method === 'cod' ? '代金引換' : order.payment_method === 'credit_card' ? 'クレジットカード' : order.payment_method === 'family' ? 'ファミリーマート決済' : order.payment_method}
+                            </div>
+                            {order.payment_method === 'family' && order.payment_deadline && (
+                                <div className="mt-1 text-red-600 font-semibold">
+                                    支払い期限: {new Date(order.payment_deadline).toLocaleString('ja-JP', { 
+                                        year: 'numeric', 
+                                        month: '2-digit', 
+                                        day: '2-digit', 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                    })}
+                                    {new Date(order.payment_deadline) < new Date() && (
+                                        <span className="ml-2 text-red-700">(期限切れ)</span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="flex gap-4">
                             {(order.status === 'pending' || order.status === 'processing') && (
@@ -263,6 +309,26 @@ export const OrdersPanel: React.FC = () => {
                                 <button className="text-sm text-amber-600 hover:underline font-medium flex items-center gap-1">
                                     🚚 配送状況を確認する
                                 </button>
+                            )}
+                            {order.status === 'delivered' && (
+                                <>
+                                    {order.has_active_return ? (
+                                        <button 
+                                            disabled
+                                            className="text-sm text-stone-400 font-medium border border-stone-200 bg-stone-50 px-3 py-1 rounded cursor-not-allowed flex items-center gap-1"
+                                            title="返品リクエストが既に存在します"
+                                        >
+                                            🔄 返品リクエスト済み
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={() => setReturnOrderId(order.id)}
+                                            className="text-sm text-amber-600 hover:text-amber-800 font-medium border border-amber-200 bg-white px-3 py-1 rounded hover:bg-amber-50 transition-colors flex items-center gap-1"
+                                        >
+                                            🔄 返品リクエスト
+                                        </button>
+                                    )}
+                                </>
                             )}
                             {order.status === 'cancelled' && (
                                 <div className="flex gap-2">

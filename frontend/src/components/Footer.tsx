@@ -44,7 +44,7 @@ export const Footer: React.FC = () => {
             <ul className="space-y-3">
               <li><Link to="/contact" className="text-stone-400 hover:text-amber-400 transition-colors">よくある質問</Link></li>
               <li><Link to="#" className="text-stone-400 hover:text-amber-400 transition-colors">配送・送料</Link></li>
-              <li><Link to="#" className="text-stone-400 hover:text-amber-400 transition-colors">返品・交換</Link></li>
+              <li><Link to="/return-policy" className="text-stone-400 hover:text-amber-400 transition-colors">返品・交換</Link></li>
               <li><Link to="#" className="text-stone-400 hover:text-amber-400 transition-colors">プライバシーポリシー</Link></li>
             </ul>
           </div>

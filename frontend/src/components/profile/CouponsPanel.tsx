@@ -24,10 +24,13 @@ export default function CouponsPanel() {
     const loadCoupons = async () => {
         try {
             const data = await couponService.list();
-            setCoupons(data);
+            // Handle both array and paginated response
+            const couponsArray = Array.isArray(data) ? data : (data.results || []);
+            setCoupons(couponsArray);
         } catch (error) {
             console.error('Failed to load coupons', error);
             toast.error('クーポンを読み込めませんでした');
+            setCoupons([]); // Set empty array on error
         } finally {
             setLoading(false);
         }
@@ -83,7 +86,7 @@ export default function CouponsPanel() {
                 </button>
             </form>
 
-            {coupons.length === 0 ? (
+            {!Array.isArray(coupons) || coupons.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-lg border border-stone-200">
                     <p className="text-stone-500">現在利用可能なクーポンはありません。</p>
                 </div>

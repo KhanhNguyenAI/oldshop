@@ -70,8 +70,12 @@ export const CartSidebar: React.FC = () => {
           ) : (
             items.map((item) => (
               <div key={item.product.id} className="flex gap-4 bg-white p-3 rounded-lg border border-stone-100 shadow-sm">
-                {/* Image */}
-                <div className="w-20 h-20 bg-stone-100 rounded-md overflow-hidden flex-shrink-0 border border-stone-200">
+                {/* Image - Clickable */}
+                <Link 
+                  to={`/products/${item.product.id}`}
+                  onClick={closeCart}
+                  className="w-20 h-20 bg-stone-100 rounded-md overflow-hidden flex-shrink-0 border border-stone-200 hover:opacity-80 transition-opacity"
+                >
                   {item.product.image ? (
                     <img 
                       src={item.product.image} 
@@ -81,14 +85,18 @@ export const CartSidebar: React.FC = () => {
                   ) : (
                      <div className="w-full h-full flex items-center justify-center text-stone-300">📷</div>
                   )}
-                </div>
+                </Link>
 
                 {/* Info */}
                 <div className="flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="font-medium text-stone-900 text-sm line-clamp-2 mb-1">
+                    <Link 
+                      to={`/products/${item.product.id}`}
+                      onClick={closeCart}
+                      className="font-medium text-stone-900 text-sm line-clamp-2 mb-1 hover:text-amber-600 transition-colors block"
+                    >
                       {item.product.title}
-                    </h3>
+                    </Link>
                     <p className="text-amber-700 font-bold text-sm">
                         {item.product.sale_price ? (
                             <>

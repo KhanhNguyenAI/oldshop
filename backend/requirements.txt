@@ -7,3 +7,12 @@ psycopg2-binary
 Pillow
 supabase
 django-filter
+langchain
+langchain-google-genai
+langchain-community
+langchain-text-splitters
+langdetect
+chromadb
+sentence-transformers
+google-generativeai
+stripe

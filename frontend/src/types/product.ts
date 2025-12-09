@@ -25,6 +25,15 @@ export interface Product {
     price: string;
     sale_price?: number;
     active_discount_percent?: number;
+    active_discount?: {
+        id: number | null;
+        name: string;
+        type: 'percent' | 'amount';
+        value: number;
+        applied_from: 'product' | 'category' | 'parent_category' | null;
+        start_date?: string | null;
+        end_date?: string | null;
+    } | null;
     condition: 'new' | 'like_new' | 'good' | 'fair' | 'poor';
     condition_detail?: string;
     specifications?: Record<string, string>;
@@ -32,6 +41,7 @@ export interface Product {
     stock_quantity: number;
     sold_quantity: number;
     is_sold: boolean;
+    is_verified?: boolean;
     created_at: string;
     updated_at: string;
     image?: string; // Main image
@@ -39,6 +49,7 @@ export interface Product {
     avg_rating?: number;
     rating_count?: number;
     user_rating?: number | null;
+    return_status?: 'delivered' | 'returning' | 'returned' | null; // Return status for current user
 }
 
 export interface CreateProductData {
@@ -58,4 +69,11 @@ export interface ProductFilters {
     max_price?: number;
     condition?: string;
     ordering?: string;
+}
+
+export interface PaginatedResponse<T> {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: T[];
 }

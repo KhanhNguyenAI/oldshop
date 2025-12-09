@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Logo } from './ui/Logo';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,8 +7,14 @@ import { useCart } from '../contexts/CartContext';
 export const Header: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
-  const { totalItems, toggleCart, cartIconRef } = useCart();
+  const { totalItems, toggleCart, cartIconRef, items, subtotal } = useCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profileButtonRef = useRef<HTMLAnchorElement>(null);
+  
+  const [showCartMenu, setShowCartMenu] = useState(false);
+  const cartMenuRef = useRef<HTMLDivElement>(null);
 
   const navItems = [
     { label: 'ホーム', path: '/' },
@@ -19,6 +25,56 @@ export const Header: React.FC = () => {
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Profile menu features
+  const profileFeatures = [
+    { icon: '👤', label: 'プロフィール', path: '/profile', tab: 'profile' },
+    { icon: '💳', label: '決済方法', path: '/profile', tab: 'banking' },
+    { icon: '📍', label: '住所', path: '/profile', tab: 'address' },
+    { icon: '🎟️', label: 'クーポン', path: '/profile', tab: 'coupons' },
+    { icon: '🔒', label: 'パスワード変更', path: '/profile', tab: 'security' },
+    { icon: '🛍️', label: '購入履歴', path: '/profile', tab: 'orders' },
+    { icon: '📅', label: '予約履歴', path: '/profile', tab: 'bookings' },
+  ];
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        profileButtonRef.current &&
+        !profileMenuRef.current.contains(event.target as Node) &&
+        !profileButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowProfileMenu(false);
+      }
+      
+      if (
+        cartMenuRef.current &&
+        cartIconRef.current &&
+        !cartMenuRef.current.contains(event.target as Node) &&
+        !cartIconRef.current.contains(event.target as Node)
+      ) {
+        setShowCartMenu(false);
+      }
+    };
+
+    if (showProfileMenu || showCartMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showProfileMenu, showCartMenu, cartIconRef]);
+
+  const formatPrice = (price: string | number) => {
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return new Intl.NumberFormat('ja-JP', {
+      style: 'currency',
+      currency: 'JPY',
+    }).format(numPrice);
+  };
 
   return (
     <header className="relative z-50 w-full">
@@ -55,30 +111,152 @@ export const Header: React.FC = () => {
               ))}
 
               {/* Cart Button */}
-              <button
-                ref={cartIconRef}
-                onClick={toggleCart}
-                className="relative p-2 ml-2 text-amber-900 hover:text-amber-700 transition-colors"
-                aria-label="Cart"
-              >
-                <span className="text-2xl">🛒</span>
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-amber-50">
-                    {totalItems}
-                  </span>
+              <div className="relative ml-2">
+                <button
+                  ref={cartIconRef}
+                  onClick={toggleCart}
+                  onMouseEnter={() => totalItems > 0 && setShowCartMenu(true)}
+                  onMouseLeave={() => setShowCartMenu(false)}
+                  className="relative p-2 text-amber-900 hover:text-amber-700 transition-colors"
+                  aria-label="Cart"
+                >
+                  <span className="text-2xl">🛒</span>
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-amber-50">
+                      {totalItems}
+                    </span>
+                  )}
+                </button>
+                
+                {/* Cart Preview Dropdown */}
+                {showCartMenu && totalItems > 0 && (
+                  <div
+                    ref={cartMenuRef}
+                    onMouseEnter={() => setShowCartMenu(true)}
+                    onMouseLeave={() => setShowCartMenu(false)}
+                    className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border-2 border-amber-200 z-50 overflow-hidden animate-fadeIn"
+                  >
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 border-b border-amber-200">
+                      <h3 className="font-bold text-amber-900 text-sm font-serif flex items-center gap-2">
+                        <span>🛒</span> ショッピングカート ({totalItems}点)
+                      </h3>
+                    </div>
+                    
+                    {/* Cart Items Preview (max 5 items) */}
+                    <div className="max-h-96 overflow-y-auto">
+                      {items.slice(0, 5).map((item) => (
+                        <div key={item.product.id} className="flex gap-3 p-3 border-b border-amber-100 hover:bg-amber-50 transition-colors">
+                          {/* Image */}
+                          <div className="w-16 h-16 bg-stone-100 rounded-md overflow-hidden flex-shrink-0 border border-stone-200">
+                            {item.product.image ? (
+                              <img 
+                                src={item.product.image} 
+                                alt={item.product.title} 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs">📷</div>
+                            )}
+                          </div>
+                          
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-stone-900 text-xs line-clamp-2 mb-1">
+                              {item.product.title}
+                            </h4>
+                            <div className="flex items-center justify-between">
+                              <span className="text-amber-700 font-bold text-xs">
+                                {item.product.sale_price ? (
+                                  <>
+                                    <span className="text-red-600">{formatPrice(item.product.sale_price)}</span>
+                                    <span className="text-stone-400 line-through text-xs ml-1">{formatPrice(item.product.price)}</span>
+                                  </>
+                                ) : (
+                                  formatPrice(item.product.price)
+                                )}
+                              </span>
+                              <span className="text-stone-500 text-xs">×{item.quantity}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {items.length > 5 && (
+                        <div className="p-3 text-center text-xs text-amber-600 bg-amber-50 border-t border-amber-200">
+                          他 {items.length - 5} 点の商品があります
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Footer with total and view cart button */}
+                    <div className="bg-amber-50 border-t border-amber-200 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-bold text-amber-900">小計:</span>
+                        <span className="text-lg font-bold text-amber-800">{formatPrice(subtotal)}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowCartMenu(false);
+                          toggleCart();
+                        }}
+                        className="w-full py-2 bg-amber-800 text-white rounded-md font-bold text-sm hover:bg-amber-700 transition-colors"
+                      >
+                        カートを見る →
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </button>
+              </div>
               
               {/* Auth Buttons */}
               <div className="ml-2 pl-4 border-l-2 border-amber-200 h-8 flex items-center gap-3">
                 {user ? (
-                  <div className="flex items-center gap-4">
-                    <Link
-                      to="/profile"
-                      className="text-xs font-bold text-amber-900 hover:text-amber-700 font-serif uppercase tracking-widest border-b border-transparent hover:border-amber-700 transition-all"
-                    >
-                      プロフィール
-                    </Link>
+                  <div className="flex items-center gap-4 relative">
+                    <div className="relative">
+                      <Link
+                        ref={profileButtonRef}
+                        to="/profile"
+                        onMouseEnter={() => setShowProfileMenu(true)}
+                        onMouseLeave={() => setShowProfileMenu(false)}
+                        className="relative p-2 text-amber-900 hover:text-amber-700 transition-colors group block"
+                        title="プロフィール"
+                        aria-label="プロフィール"
+                      >
+                        <span className="text-2xl">👤</span>
+                        <span className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0.5 bg-amber-700 group-hover:w-full transition-all duration-200"></span>
+                      </Link>
+                      
+                      {/* Profile Features Dropdown */}
+                      {showProfileMenu && (
+                        <div
+                          ref={profileMenuRef}
+                          onMouseEnter={() => setShowProfileMenu(true)}
+                          onMouseLeave={() => setShowProfileMenu(false)}
+                          className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border-2 border-amber-200 z-100100 overflow-hidden animate-fadeIn"
+                        >
+                          <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 border-b border-amber-200">
+                            <h3 className="font-bold text-amber-900 text-sm font-serif">プロフィール機能</h3><br />
+                            <p className="text-xs text-amber-700 mt-1">利用可能な機能一覧</p>
+                          </div>
+                          <div className="py-2">
+                            {profileFeatures.map((feature) => (
+                              <Link
+                                key={feature.tab}
+                                to={`${feature.path}?tab=${feature.tab}`}
+                                onClick={() => setShowProfileMenu(false)}
+                                className="flex items-center gap-3 px-4 py-2.5 hover:bg-amber-50 transition-colors group/item"
+                              >
+                                <span className="text-lg">{feature.icon}</span>
+                                <span className="text-sm text-amber-900 font-medium group-hover/item:text-amber-700">
+                                  {feature.label}
+                                </span>
+                                <span className="ml-auto text-xs text-amber-400 group-hover/item:text-amber-600">→</span>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={() => logout()}
                       className="text-xs font-bold text-red-800 hover:text-red-600 font-serif uppercase tracking-widest border-b border-transparent hover:border-red-600 transition-all"
@@ -108,17 +286,100 @@ export const Header: React.FC = () => {
             {/* Mobile menu button */}
             <div className="md:hidden flex items-center gap-4">
               {/* Cart Button Mobile */}
-              <button
-                onClick={toggleCart}
-                className="relative p-2 text-amber-900"
-              >
-                <span className="text-2xl">🛒</span>
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-amber-50">
-                    {totalItems}
-                  </span>
+              <div className="relative">
+                <button
+                  onClick={toggleCart}
+                  onMouseEnter={() => totalItems > 0 && setShowCartMenu(true)}
+                  onMouseLeave={() => setShowCartMenu(false)}
+                  className="relative p-2 text-amber-900"
+                >
+                  <span className="text-2xl">🛒</span>
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-amber-50">
+                      {totalItems}
+                    </span>
+                  )}
+                </button>
+                
+                {/* Cart Preview Dropdown for Mobile (same as desktop) */}
+                {showCartMenu && totalItems > 0 && (
+                  <div
+                    ref={cartMenuRef}
+                    onMouseEnter={() => setShowCartMenu(true)}
+                    onMouseLeave={() => setShowCartMenu(false)}
+                    className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border-2 border-amber-200 z-50 overflow-hidden animate-fadeIn"
+                  >
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 border-b border-amber-200">
+                      <h3 className="font-bold text-amber-900 text-sm font-serif flex items-center gap-2">
+                        <span>🛒</span> ショッピングカート ({totalItems}点)
+                      </h3>
+                    </div>
+                    
+                    {/* Cart Items Preview (max 5 items) */}
+                    <div className="max-h-96 overflow-y-auto">
+                      {items.slice(0, 5).map((item) => (
+                        <div key={item.product.id} className="flex gap-3 p-3 border-b border-amber-100 hover:bg-amber-50 transition-colors">
+                          {/* Image */}
+                          <div className="w-16 h-16 bg-stone-100 rounded-md overflow-hidden flex-shrink-0 border border-stone-200">
+                            {item.product.image ? (
+                              <img 
+                                src={item.product.image} 
+                                alt={item.product.title} 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs">📷</div>
+                            )}
+                          </div>
+                          
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-stone-900 text-xs line-clamp-2 mb-1">
+                              {item.product.title}
+                            </h4>
+                            <div className="flex items-center justify-between">
+                              <span className="text-amber-700 font-bold text-xs">
+                                {item.product.sale_price ? (
+                                  <>
+                                    <span className="text-red-600">{formatPrice(item.product.sale_price)}</span>
+                                    <span className="text-stone-400 line-through text-xs ml-1">{formatPrice(item.product.price)}</span>
+                                  </>
+                                ) : (
+                                  formatPrice(item.product.price)
+                                )}
+                              </span>
+                              <span className="text-stone-500 text-xs">×{item.quantity}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {items.length > 5 && (
+                        <div className="p-3 text-center text-xs text-amber-600 bg-amber-50 border-t border-amber-200">
+                          他 {items.length - 5} 点の商品があります
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Footer with total and view cart button */}
+                    <div className="bg-amber-50 border-t border-amber-200 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-bold text-amber-900">小計:</span>
+                        <span className="text-lg font-bold text-amber-800">{formatPrice(subtotal)}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowCartMenu(false);
+                          toggleCart();
+                        }}
+                        className="w-full py-2 bg-amber-800 text-white rounded-md font-bold text-sm hover:bg-amber-700 transition-colors"
+                      >
+                        カートを見る →
+                      </button>
+                    </div>
+                  </div>
                 )}
-              </button>
+              </div>
 
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}

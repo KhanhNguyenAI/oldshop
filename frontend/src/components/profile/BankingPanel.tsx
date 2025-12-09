@@ -31,9 +31,12 @@ export const BankingPanel: React.FC = () => {
     try {
       setIsLoadingCards(true);
       const data = await paymentService.list();
-      setCards(data);
+      // Handle both array and paginated response
+      const cardsArray = Array.isArray(data) ? data : (data.results || []);
+      setCards(cardsArray);
     } catch (error) {
       console.error('Failed to load cards', error);
+      setCards([]); // Set empty array on error
     } finally {
       setIsLoadingCards(false);
     }
@@ -161,7 +164,7 @@ export const BankingPanel: React.FC = () => {
       <div className="space-y-4">
         {isLoadingCards ? (
           <p className="text-sm text-gray-500 font-serif">カードを読み込み中...</p>
-        ) : cards.length === 0 ? (
+        ) : !Array.isArray(cards) || cards.length === 0 ? (
           <p className="text-sm text-gray-500 font-serif">保存されたカードがありません。</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">

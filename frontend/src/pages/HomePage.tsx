@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Header } from '../components/Header';
+import { RobotAssistant } from '../components/RobotAssistant';
 import { useAuth } from '../contexts/AuthContext';
 
 export const HomePage: React.FC = () => {
@@ -47,6 +48,11 @@ export const HomePage: React.FC = () => {
                </Link>
              </div>
            )}
+        </div>
+
+        {/* Robot Assistant Section */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+          <RobotAssistant />
         </div>
 
         {/* User Dashboard Section (Only if logged in) */}

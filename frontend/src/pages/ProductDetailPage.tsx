@@ -1,17 +1,23 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { productService } from '../services/productService';
+import { geminiService } from '../services/geminiService';
 import type { Product } from '../types/product';
 import { useCart } from '../contexts/CartContext';
 import { Header } from '../components/Header';
 import { PageLoader } from '../components/ui/PageLoader';
 import { ProductReviews } from '../components/shop/ProductReviews';
+import { ProductRecommendations } from '../components/shop/ProductRecommendations';
+import { StampedEffect } from '../components/ui/StampedEffect';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string>('');
+  const [isGeminiModalOpen, setIsGeminiModalOpen] = useState(false);
+  const [geminiAnswer, setGeminiAnswer] = useState<string>('');
+  const [isGeminiLoading, setIsGeminiLoading] = useState(false);
   const reviewsRef = useRef<HTMLDivElement>(null);
   const { addToCart, addToCartWithFlyEffect } = useCart();
 
@@ -46,6 +52,38 @@ export const ProductDetailPage: React.FC = () => {
     reviewsRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleAskGemini = async () => {
+    if (!product) return;
+    
+    setIsGeminiModalOpen(true);
+    setIsGeminiLoading(true);
+    setGeminiAnswer('');
+
+    try {
+      // Format câu hỏi với thông tin sản phẩm
+      const price = product.sale_price || product.price;
+      const formattedPrice = new Intl.NumberFormat('ja-JP', {
+        style: 'currency',
+        currency: 'JPY',
+      }).format(Number(price));
+
+      // Lấy description, nếu quá dài thì cắt ngắn
+      const productDescription = product.description.length > 200 
+        ? product.description.substring(0, 200) + '...' 
+        : product.description;
+
+      const question = `商品「${product.title}」について、説明「${productDescription}」で価格「${formattedPrice}」で購入する価値はありますか？この商品を購入して使用することをお勧めしますか？`;
+      
+      const answer = await geminiService.askQuestion(question, product.id);
+      setGeminiAnswer(answer);
+    } catch (error: unknown) {
+      setGeminiAnswer('申し訳ございません。Gemini APIへの接続に失敗しました。しばらくしてから再度お試しください。');
+      console.error('Failed to get Gemini response:', error);
+    } finally {
+      setIsGeminiLoading(false);
+    }
+  };
+
   if (loading) return <PageLoader />;
   if (!product) return <div className="text-center py-20">商品が見つかりません</div>;
 
@@ -56,12 +94,82 @@ export const ProductDetailPage: React.FC = () => {
     }).format(Number(price));
   };
 
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date);
+  };
+
   const conditionLabels: Record<string, string> = {
     new: '新品',
     like_new: '未使用に近い',
     good: '目立った傷や汚れなし',
     fair: 'やや傷や汚れあり',
     poor: '全体的に状態が悪い',
+  };
+
+  const getReturnPolicy = () => {
+    switch (product.condition) {
+      case 'new':
+        return {
+          title: '新品 (New)',
+          icon: '✨',
+          policies: [
+            { period: 'お届けから7日以内', refund: '100%返金', color: 'text-green-600' },
+            { period: 'お届けから8〜30日以内', refund: '80%返金', color: 'text-green-600' },
+            { period: 'お届けから31日以降', refund: '返品不可', color: 'text-red-600' },
+          ],
+          bgColor: 'from-green-50 to-emerald-50',
+        };
+      case 'like_new':
+        return {
+          title: '未使用に近い (Like New)',
+          icon: '🌟',
+          policies: [
+            { period: 'お届けから3日以内', refund: '100%返金', color: 'text-green-600' },
+            { period: 'お届けから4〜7日以内', refund: '80%返金', color: 'text-green-600' },
+            { period: 'お届けから8日以降', refund: '返品不可', color: 'text-red-600' },
+          ],
+          bgColor: 'from-blue-50 to-cyan-50',
+        };
+      case 'good':
+        return {
+          title: '目立った傷や汚れなし (Good)',
+          icon: '👍',
+          policies: [
+            { period: 'お届けから3日以内', refund: '100%返金', color: 'text-green-600' },
+            { period: 'お届けから4日以降', refund: '返品不可', color: 'text-red-600' },
+          ],
+          bgColor: 'from-amber-50 to-yellow-50',
+        };
+      case 'fair':
+        return {
+          title: 'やや傷や汚れあり (Fair)',
+          icon: '⚠️',
+          policies: [
+            { period: 'お届けから3日以内', refund: '100%返金', color: 'text-green-600' },
+            { period: 'お届けから4日以降', refund: '返品不可', color: 'text-red-600' },
+          ],
+          bgColor: 'from-orange-50 to-amber-50',
+        };
+      case 'poor':
+        return {
+          title: '全体的に状態が悪い (Poor)',
+          icon: '❌',
+          policies: [
+            { period: '返品不可', refund: 'この状態の商品は返品・交換を受け付けておりません', color: 'text-red-600' },
+          ],
+          bgColor: 'from-red-50 to-pink-50',
+        };
+      default:
+        return null;
+    }
   };
 
   const renderSpecifications = () => {
@@ -120,11 +228,29 @@ export const ProductDetailPage: React.FC = () => {
                         <span className="text-6xl">📷</span>
                     </div>
                 )}
+                {/* Stamped Effects - Overlay for sold out */}
                 {product.is_sold && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <span className="text-white font-bold text-3xl border-4 border-white px-8 py-2 -rotate-12">SOLD OUT</span>
-                  </div>
+                  <StampedEffect type="sold_out" variant="overlay" />
                 )}
+                
+                {/* Stamped Effects - Small stamp for return status */}
+                {!product.is_sold && product.return_status === 'delivered' && (
+                  <StampedEffect type="delivered" variant="stamp" />
+                )}
+                {!product.is_sold && product.return_status === 'returning' && (
+                  <StampedEffect type="returning" variant="stamp" />
+                )}
+                {!product.is_sold && product.return_status === 'returned' && (
+                  <StampedEffect type="returned" variant="stamp" />
+                )}
+                {/* Ask Gemini Button */}
+                <button
+                  onClick={handleAskGemini}
+                  className="absolute top-4 right-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 font-bold text-sm flex items-center gap-2 z-10"
+                >
+                  <span>🤖</span>
+                  <span>専門家</span>
+                </button>
             </div>
             
             {/* Thumbnails */}
@@ -176,6 +302,60 @@ export const ProductDetailPage: React.FC = () => {
                         </span>
                     )}
                 </div>
+
+                {/* Sale Information Card */}
+                {product.active_discount && product.sale_price && (
+                    <div className="mb-6 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 shadow-sm">
+                        <div className="flex items-start gap-3">
+                            <span className="text-2xl">🏷️</span>
+                            <div className="flex-1">
+                                <h4 className="font-bold text-red-800 mb-2 text-lg">
+                                    {product.active_discount.name || 'セール中'}
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex items-center gap-2 text-red-700">
+                                        <span className="font-semibold">
+                                            {product.active_discount.type === 'percent'
+                                                ? `${product.active_discount.value}%割引`
+                                                : `¥${product.active_discount.value}割引`}
+                                        </span>
+                                        {product.active_discount.applied_from === 'product' && (
+                                            <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs font-medium">
+                                                この商品専用
+                                            </span>
+                                        )}
+                                        {product.active_discount.applied_from === 'category' && (
+                                            <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs font-medium">
+                                                カテゴリー割引
+                                            </span>
+                                        )}
+                                        {product.active_discount.applied_from === 'parent_category' && (
+                                            <span className="bg-red-200 text-red-800 px-2 py-0.5 rounded text-xs font-medium">
+                                                親カテゴリー割引
+                                            </span>
+                                        )}
+                                    </div>
+                                    {(product.active_discount.start_date || product.active_discount.end_date) && (
+                                        <div className="pt-2 border-t border-red-200 space-y-1 text-red-600">
+                                            {product.active_discount.start_date && (
+                                                <div className="flex items-center gap-2">
+                                                    <span>📅</span>
+                                                    <span>開始: {formatDate(product.active_discount.start_date)}</span>
+                                                </div>
+                                            )}
+                                            {product.active_discount.end_date && (
+                                                <div className="flex items-center gap-2">
+                                                    <span>⏰</span>
+                                                    <span>終了: {formatDate(product.active_discount.end_date)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex flex-wrap gap-4 mb-6 text-sm">
                     {product.stock_quantity > 0 && (
@@ -322,20 +502,111 @@ export const ProductDetailPage: React.FC = () => {
                         </div>
                     </div>
                 </section>
-            </div>
-            
-            <div ref={reviewsRef}>
-                <ProductReviews 
-                    productId={product.id} 
-                    avgRating={product.avg_rating}
-                    ratingCount={product.rating_count}
-                    userRating={product.user_rating}
-                    onRatingUpdate={refreshProduct}
-                />
+
+                {/* Return Policy */}
+                {getReturnPolicy() && (
+                    <section className={`bg-gradient-to-r ${getReturnPolicy()?.bgColor} p-6 rounded-xl border border-stone-200 shadow-sm`}>
+                        <h3 className="text-lg font-serif font-bold text-stone-900 mb-4 flex items-center gap-2">
+                            <span>{getReturnPolicy()?.icon}</span> 返品・交換ポリシー
+                        </h3>
+                        <div className="space-y-3 mb-4">
+                            <p className="text-sm text-stone-700 font-medium mb-3">
+                                {getReturnPolicy()?.title}
+                            </p>
+                            {getReturnPolicy()?.policies.map((policy, idx) => (
+                                <div key={idx} className="flex items-center gap-2 text-sm">
+                                    <span className={policy.color === 'text-green-600' ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+                                        {policy.color === 'text-green-600' ? '✓' : '✗'}
+                                    </span>
+                                    <span className="text-stone-700">
+                                        <strong>{policy.period}:</strong> {policy.refund}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="pt-3 border-t border-stone-200">
+                            <Link 
+                                to="/return-policy" 
+                                className="text-sm text-amber-700 hover:text-amber-800 font-medium underline flex items-center gap-1"
+                            >
+                                詳細な返品・交換ポリシーを見る →
+                            </Link>
+                        </div>
+                    </section>
+                )}
             </div>
           </div>
         </div>
+
+        {/* Reviews Section - Grid below images */}
+        <div ref={reviewsRef} className="mt-12">
+          <ProductReviews 
+            productId={product.id} 
+            avgRating={product.avg_rating}
+            ratingCount={product.rating_count}
+            userRating={product.user_rating}
+            onRatingUpdate={refreshProduct}
+          />
+        </div>
+
+        {/* Recommendations Section */}
+        <ProductRecommendations productId={product.id} product={product} />
       </main>
+
+      {/* Gemini Modal */}
+      {isGeminiModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setIsGeminiModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 rounded-t-2xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🤖</span>
+                <div>
+                  <h3 className="text-white font-bold text-xl">Gemini AI</h3>
+                  <p className="text-purple-100 text-sm">商品についてのアドバイス</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsGeminiModalOpen(false)}
+                className="text-white hover:text-purple-100 transition-colors text-2xl font-bold w-8 h-8 flex items-center justify-center"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {isGeminiLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+                  <p className="text-gray-600">Geminiが考えています...</p>
+                </div>
+              ) : (
+                <div className="prose prose-stone max-w-none">
+                  <div className="bg-purple-50 border-l-4 border-purple-600 p-4 rounded-lg mb-4">
+                    <p className="text-sm text-purple-800 font-medium mb-2">質問:</p>
+                    <p className="text-gray-700 text-sm">
+                      商品「{product.title}」について、状態「{product.condition_detail || conditionLabels[product.condition]}」で価格「{formatPrice(product.sale_price || product.price)}」で購入する価値はありますか？
+                    </p>
+                  </div>
+                  <div className="bg-white border border-gray-200 p-4 rounded-lg">
+                    <p className="text-sm text-gray-800 font-medium mb-2">回答:</p>
+                    <div className="text-gray-700 whitespace-pre-line leading-relaxed">
+                      {geminiAnswer || '回答を取得できませんでした。'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

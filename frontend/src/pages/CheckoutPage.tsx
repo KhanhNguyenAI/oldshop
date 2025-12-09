@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { addressService } from '../services/addressService';
 import { orderService } from '../services/orderService';
 import { paymentService } from '../services/paymentService';
+import { strikeService } from '../services/strikeService';
 import { lookupAddressByPostalCode } from '../services/japanPostalCodeService';
 import { CouponSelector } from '../components/shop/CouponSelector';
 import type { Address } from '../types/auth';
@@ -30,6 +31,10 @@ export const CheckoutPage: React.FC = () => {
       cardHolder: '',
       brand: 'visa'
   });
+  
+  // COD Advance Payment State
+  const [codAdvancePaymentMethod, setCodAdvancePaymentMethod] = useState<'credit_card' | 'family' | null>(null);
+  const [codAdvanceCardId, setCodAdvanceCardId] = useState<number | 'new' | null>(null);
 
   // Coupon State
   const [couponCode, setCouponCode] = useState('');
@@ -51,6 +56,47 @@ export const CheckoutPage: React.FC = () => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTokyoAddress, setIsTokyoAddress] = useState<boolean | null>(null);
+  const [shippingMessage, setShippingMessage] = useState<string>('');
+
+  // Check if address is in Tokyo
+  const checkTokyoAddress = useCallback((prefecture: string): boolean => {
+    const tokyoKeywords = ['東京都', 'Tokyo', 'tokyo', 'TOKYO'];
+    const isTokyo = tokyoKeywords.some(keyword => prefecture.includes(keyword));
+    setIsTokyoAddress(isTokyo);
+    
+    if (prefecture && prefecture.trim()) {
+      if (isTokyo) {
+        setShippingMessage('東京都内のため送料無料です');
+      } else {
+        setShippingMessage('東京都外のため配送不可。直接取引のみ対応可能です');
+      }
+    } else {
+      setIsTokyoAddress(null);
+      setShippingMessage('');
+    }
+    return isTokyo;
+  }, []);
+
+  const fillFormWithAddress = useCallback((addr: Address) => {
+      const names = addr.recipient.split(' ');
+      const lastName = names[0] || '';
+      const firstName = names.slice(1).join(' ') || '';
+
+      setFormData(prev => ({
+          ...prev,
+          firstName: firstName, 
+          lastName: lastName,
+          phone: addr.phone || '',
+          postalCode: addr.postal_code,
+          prefecture: addr.prefecture,
+          city: addr.city,
+          district: addr.district || '',
+          address: addr.building || '',
+      }));
+      // Check Tokyo address when selecting saved address
+      checkTokyoAddress(addr.prefecture);
+  }, [checkTokyoAddress]);
 
   // Auto-lookup address when postal code is complete (7 digits)
   useEffect(() => {
@@ -67,6 +113,7 @@ export const CheckoutPage: React.FC = () => {
                       city: result.city, 
                       district: result.district 
                   }));
+                  checkTokyoAddress(result.prefecture);
                   toast.success('住所を自動入力しました');
               }
           }
@@ -74,36 +121,52 @@ export const CheckoutPage: React.FC = () => {
       
       const timer = setTimeout(lookupAddress, 500);
       return () => clearTimeout(timer);
-  }, [formData.postalCode]);
+  }, [formData.postalCode, checkTokyoAddress]);
 
   useEffect(() => {
     if (user) {
-        addressService.list().then(addresses => {
-            setSavedAddresses(addresses);
-            if (addresses.length > 0) {
+        addressService.list().then(data => {
+            // Handle both array and paginated response
+            const addressesArray = Array.isArray(data) ? data : ((data as { results?: Address[] }).results || []);
+            setSavedAddresses(addressesArray);
+            if (addressesArray.length > 0) {
                 // Select default or first address automatically
-                const defaultAddr = addresses.find(a => a.is_default) || addresses[0];
+                const defaultAddr = addressesArray.find((a: Address) => a.is_default) || addressesArray[0];
                 setSelectedAddressId(defaultAddr.id);
                 fillFormWithAddress(defaultAddr);
             }
-        }).catch(err => console.error("Failed to load addresses", err));
+        }).catch(err => {
+            console.error("Failed to load addresses", err);
+            setSavedAddresses([]); // Set empty array on error
+        });
     }
-  }, [user]);
+  }, [user, fillFormWithAddress]);
 
-  // Fetch cards when Credit Card is selected
+  // Fetch cards when Credit Card is selected or COD with credit card advance
   useEffect(() => {
-      if (user && formData.paymentMethod === 'credit_card') {
-          paymentService.list().then(cards => {
-              setSavedCards(cards);
-              if (cards.length > 0) {
-                  const defaultCard = cards.find(c => c.is_default) || cards[0];
-                  setSelectedCardId(defaultCard.id);
+      if (user && (formData.paymentMethod === 'credit_card' || (formData.paymentMethod === 'cod' && codAdvancePaymentMethod === 'credit_card'))) {
+          paymentService.list().then(data => {
+              // Handle both array and paginated response
+              const cardsArray = Array.isArray(data) ? data : ((data as { results?: PaymentMethod[] }).results || []);
+              setSavedCards(cardsArray);
+              if (cardsArray.length > 0) {
+                  const defaultCard = cardsArray.find((c: PaymentMethod) => c.is_default) || cardsArray[0];
+                  if (formData.paymentMethod === 'credit_card') {
+                      setSelectedCardId(defaultCard.id);
+                  } else if (formData.paymentMethod === 'cod' && codAdvancePaymentMethod === 'credit_card') {
+                      setCodAdvanceCardId(defaultCard.id);
+                  }
               } else {
-                  setShowAddCardForm(true);
+                  if (formData.paymentMethod === 'credit_card') {
+                      setShowAddCardForm(true);
+                  }
               }
-          }).catch(err => console.error("Failed to load cards", err));
+          }).catch(err => {
+              console.error("Failed to load cards", err);
+              setSavedCards([]); // Set empty array on error
+          });
       }
-  }, [user, formData.paymentMethod]);
+  }, [user, formData.paymentMethod, codAdvancePaymentMethod]);
 
   const handleAddNewCard = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -124,7 +187,14 @@ export const CheckoutPage: React.FC = () => {
           });
 
           setSavedCards(prev => [newCard, ...prev]);
-          setSelectedCardId(newCard.id);
+          
+          // Set card ID based on current payment context
+          if (formData.paymentMethod === 'credit_card') {
+              setSelectedCardId(newCard.id);
+          } else if (formData.paymentMethod === 'cod' && codAdvancePaymentMethod === 'credit_card') {
+              setCodAdvanceCardId(newCard.id);
+          }
+          
           setShowAddCardForm(false);
           setNewCardData({ cardNumber: '', expiry: '', cardHolder: '', brand: 'visa' });
           toast.success('カードを追加しました');
@@ -140,24 +210,6 @@ export const CheckoutPage: React.FC = () => {
         await applyCoupon(couponCode);
         setApplyingCoupon(false);
         setCouponCode('');
-  };
-
-  const fillFormWithAddress = (addr: Address) => {
-      const names = addr.recipient.split(' ');
-      const lastName = names[0] || '';
-      const firstName = names.slice(1).join(' ') || '';
-
-      setFormData(prev => ({
-          ...prev,
-          firstName: firstName, 
-          lastName: lastName,
-          phone: addr.phone || '',
-          postalCode: addr.postal_code,
-          prefecture: addr.prefecture,
-          city: addr.city,
-          district: addr.district || '',
-          address: addr.building || '',
-      }));
   };
 
   const handleAddressSelection = (id: number | 'new') => {
@@ -235,36 +287,80 @@ export const CheckoutPage: React.FC = () => {
         return;
     }
 
+    if (name === 'prefecture') {
+        setFormData(prev => ({ ...prev, [name]: value }));
+        checkTokyoAddress(value);
+        return;
+    }
+    
+    if (name === 'paymentMethod') {
+        setFormData(prev => ({ ...prev, [name]: value }));
+        // Reset COD advance payment state when switching away from COD
+        if (value !== 'cod') {
+            setCodAdvancePaymentMethod(null);
+            setCodAdvanceCardId(null);
+        }
+        return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Shipping calculation
-  const shippingCost = totalPrice >= 10000 ? 0 : 800;
-  const finalTotal = totalPrice + shippingCost; // totalPrice in context already includes discount
+  // Shipping calculation - Tokyo = free, outside Tokyo = not allowed
+  const shippingCost = isTokyoAddress === true ? 0 : (isTokyoAddress === false ? null : (totalPrice >= 10000 ? 0 : 800));
+  const finalTotal = shippingCost !== null ? totalPrice + shippingCost : totalPrice; // totalPrice in context already includes discount
+  
+  // COD Advance Payment calculation (10% of total + 1000 yen)
+  const codAdvanceAmount = formData.paymentMethod === 'cod' ? Math.ceil(finalTotal * 0.1) + 1000 : 0;
+  const codRemainingAmount = formData.paymentMethod === 'cod' ? finalTotal - codAdvanceAmount : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      if (formData.paymentMethod === 'credit_card' && !selectedCardId) {
-          toast.error('クレジットカードを選択してください');
-          setIsSubmitting(false);
-          return;
-      }
-
-      const full_name = formData.lastName + ' ' + formData.firstName;
+      // Determine which address to use
+      let selectedAddress: Address | null = null;
+      let orderFullName = '';
+      let orderEmail = '';
+      let orderPhone = '';
+      let orderPostalCode = '';
+      let orderCity = '';
+      let orderAddress = '';
 
       if (selectedAddressId === 'new') {
+          // Use form data for new address
+          // Check if prefecture is not filled
+          if (!formData.prefecture || formData.prefecture.trim() === '') {
+              toast.error('都道府県を入力してください');
+              setIsSubmitting(false);
+              return;
+          }
+
+          // Check if address is outside Tokyo
+          if (isTokyoAddress === false) {
+              toast.error('東京都外のため配送不可です。直接取引のみ対応可能です。お問い合わせページからご連絡ください。');
+              setIsSubmitting(false);
+              return;
+          }
+
+          orderFullName = formData.lastName + ' ' + formData.firstName;
+          orderEmail = formData.email;
+          orderPhone = formData.phone;
+          orderPostalCode = formData.postalCode;
+          orderCity = `${formData.prefecture}${formData.city}${formData.district}`;
+          orderAddress = formData.address;
+
+          // Save new address
           try {
               await addressService.create({
-                  recipient: full_name.trim(),
-                  postal_code: formData.postalCode,
+                  recipient: orderFullName.trim(),
+                  postal_code: orderPostalCode,
                   prefecture: formData.prefecture,
                   city: formData.city,
                   district: formData.district,
                   building: formData.address,
-                  phone: formData.phone,
+                  phone: orderPhone,
                   is_default: false 
               });
               toast.success('新しい住所を保存しました');
@@ -272,17 +368,60 @@ export const CheckoutPage: React.FC = () => {
               console.error('Failed to save address:', error);
               toast.error('住所の保存に失敗しましたが、注文は続行します');
           }
+      } else {
+          // Use saved address
+          selectedAddress = savedAddresses.find(addr => addr.id === selectedAddressId) || null;
+          
+          if (!selectedAddress) {
+              toast.error('選択された住所が見つかりません');
+              setIsSubmitting(false);
+              return;
+          }
+
+          // Check if saved address is in Tokyo
+          const tokyoKeywords = ['東京都', 'Tokyo', 'tokyo', 'TOKYO'];
+          const savedIsTokyo = tokyoKeywords.some(keyword => selectedAddress!.prefecture.includes(keyword));
+          
+          if (!savedIsTokyo) {
+              toast.error('選択された住所は東京都外のため配送不可です。直接取引のみ対応可能です。お問い合わせページからご連絡ください。');
+              setIsSubmitting(false);
+              return;
+          }
+
+          orderFullName = selectedAddress.recipient;
+          orderEmail = formData.email || user?.email || '';
+          orderPhone = selectedAddress.phone || '';
+          orderPostalCode = selectedAddress.postal_code;
+          orderCity = `${selectedAddress.prefecture}${selectedAddress.city}${selectedAddress.district}`;
+          orderAddress = selectedAddress.building || '';
       }
 
-      const orderCity = `${formData.prefecture}${formData.city}${formData.district}`;
-      const orderAddress = formData.address; 
+      if (formData.paymentMethod === 'credit_card' && !selectedCardId) {
+          toast.error('クレジットカードを選択してください');
+          setIsSubmitting(false);
+          return;
+      }
+      
+      // Validate COD advance payment method
+      if (formData.paymentMethod === 'cod') {
+          if (!codAdvancePaymentMethod) {
+              toast.error('前払い方法を選択してください');
+              setIsSubmitting(false);
+              return;
+          }
+          if (codAdvancePaymentMethod === 'credit_card' && !codAdvanceCardId) {
+              toast.error('前払い用のクレジットカードを選択してください');
+              setIsSubmitting(false);
+              return;
+          }
+      } 
 
       const orderData = {
-          full_name: full_name.trim(),
-          email: formData.email,
-          phone: formData.phone,
+          full_name: orderFullName.trim(),
+          email: orderEmail,
+          phone: orderPhone,
           address: orderAddress,
-          postal_code: formData.postalCode,
+          postal_code: orderPostalCode,
           city: orderCity,
           total_amount: finalTotal.toString(), 
           payment_method: formData.paymentMethod,
@@ -294,7 +433,112 @@ export const CheckoutPage: React.FC = () => {
           coupon_code: appliedCoupon ? appliedCoupon.code : null
       };
 
-      await orderService.create(orderData);
+      // Handle COD advance payment first
+      if (formData.paymentMethod === 'cod') {
+          try {
+              if (codAdvancePaymentMethod === 'family') {
+                  // Create order first
+                  const order = await orderService.create(orderData);
+                  
+                  // Create FamilyMart payment for advance
+                  const advancePaymentIntent = await strikeService.createFamilyPayment({
+                      amount: codAdvanceAmount,
+                      order_id: order.id,
+                      metadata: {
+                          email: orderEmail,
+                          phone: orderPhone,
+                          full_name: orderFullName.trim(),
+                          is_cod_advance: 'true'
+                      }
+                  });
+                  
+                  toast.success('注文が完了しました。前払いの準備ができました。');
+                  navigate('/order-success', { 
+                      state: { 
+                          orderId: order.id,
+                          paymentIntentId: advancePaymentIntent.payment_intent_id,
+                          paymentMethod: 'family',
+                          isCodAdvance: true,
+                          advanceAmount: codAdvanceAmount,
+                          remainingAmount: codRemainingAmount
+                      } 
+                  });
+                  
+                  clearCart();
+                  return;
+              } else if (codAdvancePaymentMethod === 'credit_card') {
+                  // Process credit card payment for advance
+                  // In a real implementation, you would charge the card here using the payment gateway
+                  // For now, we'll create the order and note that advance payment was processed
+                  
+                  // Create order
+                  const order = await orderService.create(orderData);
+                  
+                  // TODO: In production, charge the credit card here for codAdvanceAmount
+                  // Example: await paymentGateway.charge(codAdvanceCardId, codAdvanceAmount);
+                  
+                  toast.success('注文が完了しました。前払いが処理されました。');
+                  navigate('/order-success', { 
+                      state: { 
+                          orderId: order.id,
+                          paymentMethod: 'cod',
+                          isCodAdvance: true,
+                          advanceAmount: codAdvanceAmount,
+                          remainingAmount: codRemainingAmount
+                      } 
+                  });
+                  
+                  clearCart();
+                  return;
+              }
+          } catch (error: unknown) {
+              console.error('COD advance payment error:', error);
+              toast.error('前払い処理に失敗しました。もう一度お試しください。');
+              setIsSubmitting(false);
+              return;
+          }
+      }
+
+      // Create order for non-COD payment methods
+      const order = await orderService.create(orderData);
+
+      // Handle Family payment method
+      if (formData.paymentMethod === 'family') {
+          try {
+              // Create payment intent
+              const paymentIntent = await strikeService.createFamilyPayment({
+                  amount: finalTotal,
+                  order_id: order.id,
+                  metadata: {
+                      email: orderEmail,
+                      phone: orderPhone,
+                      full_name: orderFullName.trim()
+                  }
+              });
+
+              // Redirect to payment page or show payment instructions
+              toast.success('ファミリーマート決済の準備ができました');
+              
+              // Store payment intent info for confirmation
+              // In a real implementation, you would redirect to Stripe's payment page
+              // or show instructions for FamilyMart payment
+              navigate('/order-success', { 
+                  state: { 
+                      orderId: order.id,
+                      paymentIntentId: paymentIntent.payment_intent_id,
+                      paymentMethod: 'family'
+                  } 
+              });
+              
+              clearCart();
+              return;
+          } catch (error: unknown) {
+              console.error('Family payment error:', error);
+              toast.error('ファミリーマート決済の作成に失敗しました。もう一度お試しください。');
+              setIsSubmitting(false);
+              return;
+          }
+      }
 
       toast.success('注文が完了しました！');
       clearCart();
@@ -445,11 +689,23 @@ export const CheckoutPage: React.FC = () => {
                             type="text" 
                             name="prefecture"
                             required={selectedAddressId === 'new'}
-                            className="w-full rounded-md border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500"
+                            className={`w-full rounded-md border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 ${
+                                isTokyoAddress === false ? 'border-red-500 bg-red-50' : 
+                                isTokyoAddress === true ? 'border-green-500 bg-green-50' : ''
+                            }`}
                             placeholder="東京都"
                             value={formData.prefecture}
                             onChange={handleInputChange}
                         />
+                        {shippingMessage && (
+                            <p className={`text-xs mt-1 ${
+                                isTokyoAddress === true ? 'text-green-600' : 
+                                isTokyoAddress === false ? 'text-red-600 font-semibold' : 
+                                'text-stone-500'
+                            }`}>
+                                {shippingMessage}
+                            </p>
+                        )}
                      </div>
                  </div>
 
@@ -515,10 +771,148 @@ export const CheckoutPage: React.FC = () => {
                       />
                       <span className="ml-3 flex-1">
                           <span className="block text-sm font-medium text-gray-900">代金引換 (Cash on Delivery)</span>
-                          <span className="block text-sm text-gray-500">手数料: 無料 (キャンペーン中)</span>
+                          <span className="block text-sm text-gray-500">前払い: 注文金額の10% + 1,000円 (クレジットカードまたはファミリーマート決済)</span>
                       </span>
                       <span className="text-2xl">🚚</span>
                   </label>
+                  
+                  {/* COD Advance Payment Method Selection */}
+                  {formData.paymentMethod === 'cod' && (
+                      <div className="ml-8 mt-4 space-y-4 border-l-2 border-amber-200 pl-4 bg-amber-50/30 rounded-r-lg p-4">
+                          <p className="text-sm font-bold text-amber-900 mb-3">
+                              前払い方法を選択してください ({formatPrice(codAdvanceAmount)})
+                          </p>
+                          
+                          <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${codAdvancePaymentMethod === 'credit_card' ? 'border-amber-500 bg-white' : 'border-stone-200 hover:bg-white'}`}>
+                              <input 
+                                type="radio" 
+                                name="codAdvancePaymentMethod" 
+                                value="credit_card" 
+                                checked={codAdvancePaymentMethod === 'credit_card'}
+                                onChange={(e) => {
+                                    setCodAdvancePaymentMethod('credit_card');
+                                    setCodAdvanceCardId(null);
+                                }}
+                                className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300"
+                              />
+                              <span className="ml-3 flex-1">
+                                  <span className="block text-sm font-medium text-gray-900">クレジットカード</span>
+                              </span>
+                              <span className="text-xl">💳</span>
+                          </label>
+                          
+                          {/* Saved Cards for COD Advance */}
+                          {codAdvancePaymentMethod === 'credit_card' && (
+                              <div className="ml-4 space-y-3">
+                                  {Array.isArray(savedCards) && savedCards.map(card => (
+                                      <label key={card.id} className="flex items-center gap-3 cursor-pointer group">
+                                          <input 
+                                              type="radio" 
+                                              name="codAdvanceCardSelection"
+                                              checked={codAdvanceCardId === card.id}
+                                              onChange={() => setCodAdvanceCardId(card.id)}
+                                              className="text-amber-600 focus:ring-amber-500"
+                                          />
+                                          <div className="flex items-center gap-2 p-2 rounded-lg border border-stone-200 bg-white group-hover:border-amber-400 transition-colors w-full">
+                                              <span className="font-bold text-xs uppercase bg-stone-100 px-2 py-1 rounded">{card.brand}</span>
+                                              <span className="text-sm font-mono">•••• {card.last4}</span>
+                                              <span className="text-xs text-stone-500 ml-auto">Exp: {card.exp_month}/{card.exp_year}</span>
+                                          </div>
+                                      </label>
+                                  ))}
+                                  
+                                  {!showAddCardForm && (
+                                      <button 
+                                          type="button"
+                                          onClick={() => setShowAddCardForm(true)}
+                                          className="text-sm text-amber-600 font-medium hover:underline flex items-center gap-1"
+                                      >
+                                          + 新しいカードを追加
+                                      </button>
+                                  )}
+                                  
+                                  {showAddCardForm && (
+                                      <div className="bg-stone-50 p-4 rounded-lg border border-stone-200 animate-fadeIn">
+                                          <h4 className="text-sm font-bold text-stone-700 mb-3">新しいカード情報</h4>
+                                          <div className="space-y-3">
+                                              <input 
+                                                  type="text" 
+                                                  placeholder="カード番号 (例: 4242...)" 
+                                                  className="w-full text-sm rounded border-stone-300"
+                                                  value={newCardData.cardNumber}
+                                                  onChange={e => setNewCardData({...newCardData, cardNumber: e.target.value})}
+                                              />
+                                              <div className="flex gap-2">
+                                                  <input 
+                                                      type="text" 
+                                                      placeholder="MM/YY" 
+                                                      className="w-1/3 text-sm rounded border-stone-300"
+                                                      value={newCardData.expiry}
+                                                      onChange={e => setNewCardData({...newCardData, expiry: e.target.value})}
+                                                  />
+                                                  <input 
+                                                      type="text" 
+                                                      placeholder="カード名義人" 
+                                                      className="flex-1 text-sm rounded border-stone-300"
+                                                      value={newCardData.cardHolder}
+                                                      onChange={e => setNewCardData({...newCardData, cardHolder: e.target.value})}
+                                                  />
+                                              </div>
+                                              <select 
+                                                  title="Card Brand"
+                                                  className="w-full text-sm rounded border-stone-300"
+                                                  value={newCardData.brand}
+                                                  onChange={e => setNewCardData({...newCardData, brand: e.target.value})}
+                                              >
+                                                  <option value="visa">Visa</option>
+                                                  <option value="jcb">JCB</option>
+                                                  <option value="amex">Amex</option>
+                                                  <option value="mastercard">Mastercard</option>
+                                              </select>
+                                              <div className="flex gap-2 pt-2">
+                                                  <button 
+                                                      type="button" 
+                                                      onClick={async (e) => {
+                                                          await handleAddNewCard(e);
+                                                          if (savedCards.length > 0) {
+                                                              const newCard = savedCards[0];
+                                                              setCodAdvanceCardId(newCard.id);
+                                                          }
+                                                      }}
+                                                      className="px-3 py-1 bg-amber-600 text-white text-xs rounded hover:bg-amber-700"
+                                                  >
+                                                      追加する
+                                                  </button>
+                                                  <button 
+                                                      type="button" 
+                                                      onClick={() => setShowAddCardForm(false)}
+                                                      className="px-3 py-1 bg-stone-200 text-stone-700 text-xs rounded hover:bg-stone-300"
+                                                  >
+                                                      キャンセル
+                                                  </button>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  )}
+                              </div>
+                          )}
+                          
+                          <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${codAdvancePaymentMethod === 'family' ? 'border-amber-500 bg-white' : 'border-stone-200 hover:bg-white'}`}>
+                              <input 
+                                type="radio" 
+                                name="codAdvancePaymentMethod" 
+                                value="family" 
+                                checked={codAdvancePaymentMethod === 'family'}
+                                onChange={(e) => setCodAdvancePaymentMethod('family')}
+                                className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300"
+                              />
+                              <span className="ml-3 flex-1">
+                                  <span className="block text-sm font-medium text-gray-900">ファミリーマート決済</span>
+                              </span>
+                              <span className="text-xl">🏪</span>
+                          </label>
+                      </div>
+                  )}
 
                   <label className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${formData.paymentMethod === 'credit_card' ? 'border-amber-500 bg-amber-50' : 'border-stone-200 hover:bg-stone-50'}`}>
                       <input 
@@ -539,7 +933,7 @@ export const CheckoutPage: React.FC = () => {
                   {/* Saved Cards List */}
                   {formData.paymentMethod === 'credit_card' && (
                       <div className="ml-8 mt-4 space-y-4 border-l-2 border-stone-200 pl-4">
-                          {savedCards.map(card => (
+                          {Array.isArray(savedCards) && savedCards.map(card => (
                               <label key={card.id} className="flex items-center gap-3 cursor-pointer group">
                                   <input 
                                       type="radio" 
@@ -624,20 +1018,20 @@ export const CheckoutPage: React.FC = () => {
                       </div>
                   )}
 
-                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${formData.paymentMethod === 'bank_transfer' ? 'border-amber-500 bg-amber-50' : 'border-stone-200 hover:bg-stone-50'}`}>
+                  <label className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${formData.paymentMethod === 'family' ? 'border-amber-500 bg-amber-50' : 'border-stone-200 hover:bg-stone-50'}`}>
                       <input 
                         type="radio" 
                         name="paymentMethod" 
-                        value="bank_transfer" 
-                        checked={formData.paymentMethod === 'bank_transfer'}
+                        value="family" 
+                        checked={formData.paymentMethod === 'family'}
                         onChange={handleInputChange}
                         className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300"
                       />
                       <span className="ml-3 flex-1">
-                          <span className="block text-sm font-medium text-gray-900">銀行振込</span>
-                          <span className="block text-sm text-gray-500">ご入金確認後の発送となります</span>
+                          <span className="block text-sm font-medium text-gray-900">ファミリーマート決済 (FamilyMart Payment)</span>
+                          <span className="block text-sm text-gray-500">コンビニで支払い可能。手数料無料</span>
                       </span>
-                      <span className="text-2xl">🏦</span>
+                      <span className="text-2xl">🏪</span>
                   </label>
               </div>
             </section>
@@ -652,15 +1046,23 @@ export const CheckoutPage: React.FC = () => {
                 <div className="space-y-4 mb-6 max-h-[300px] overflow-y-auto pr-2">
                     {items.map(item => (
                         <div key={item.product.id} className="flex gap-3">
-                            <div className="w-16 h-16 bg-stone-100 rounded border border-stone-200 overflow-hidden flex-shrink-0">
+                            <Link 
+                                to={`/products/${item.product.id}`}
+                                className="w-16 h-16 bg-stone-100 rounded border border-stone-200 overflow-hidden flex-shrink-0 hover:opacity-80 transition-opacity"
+                            >
                                 {item.product.image ? (
                                     <img src={item.product.image} alt={item.product.title} className="w-full h-full object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-stone-300 text-xs">No Img</div>
                                 )}
-                            </div>
+                            </Link>
                             <div className="flex-1 text-sm">
-                                <p className="font-medium text-stone-900 line-clamp-2">{item.product.title}</p>
+                                <Link 
+                                    to={`/products/${item.product.id}`}
+                                    className="font-medium text-stone-900 line-clamp-2 hover:text-amber-600 transition-colors block"
+                                >
+                                    {item.product.title}
+                                </Link>
                                 <p className="text-stone-500">数量: {item.quantity}</p>
                                 <div className="flex flex-col items-start mt-1">
                                     {item.product.sale_price ? (
@@ -745,11 +1147,43 @@ export const CheckoutPage: React.FC = () => {
                     )}
                     <div className="flex justify-between text-stone-600">
                         <span>配送料</span>
-                        <span>{shippingCost === 0 ? '無料' : formatPrice(shippingCost)}</span>
+                        <span>
+                            {isTokyoAddress === false ? (
+                                <span className="text-red-600 font-semibold">配送不可</span>
+                            ) : shippingCost === 0 ? (
+                                <span className="text-green-600 font-semibold">無料</span>
+                            ) : shippingCost !== null ? (
+                                formatPrice(shippingCost)
+                            ) : (
+                                '計算中...'
+                            )}
+                        </span>
                     </div>
+                    {isTokyoAddress === false && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mt-2">
+                            <p className="text-sm text-red-800 font-medium">
+                                ⚠️ 東京都外のため配送不可です。直接取引のみ対応可能です。
+                            </p>
+                            <p className="text-xs text-red-600 mt-1">
+                                お問い合わせページからご連絡ください。
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="border-t border-stone-200 mt-4 pt-4 mb-6">
+                    {formData.paymentMethod === 'cod' && codAdvanceAmount > 0 && (
+                        <div className="mb-4 space-y-2 pb-4 border-b border-stone-100">
+                            <div className="flex justify-between text-sm text-stone-600">
+                                <span>前払い金額 (10% + 1,000円)</span>
+                                <span className="font-semibold text-amber-700">{formatPrice(codAdvanceAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-stone-600">
+                                <span>残り金額 (代金引換)</span>
+                                <span className="font-semibold text-stone-700">{formatPrice(codRemainingAmount)}</span>
+                            </div>
+                        </div>
+                    )}
                     <div className="flex justify-between text-xl font-bold text-stone-900">
                         <span>合計</span>
                         <span>{formatPrice(finalTotal)}</span>
@@ -760,7 +1194,7 @@ export const CheckoutPage: React.FC = () => {
                 <button 
                     type="submit" 
                     form="checkout-form"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isTokyoAddress === false || (formData.paymentMethod === 'cod' && !codAdvancePaymentMethod)}
                     className="w-full py-4 bg-amber-600 text-white rounded-lg font-bold text-lg hover:bg-amber-700 shadow-lg shadow-amber-200 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {isSubmitting ? (

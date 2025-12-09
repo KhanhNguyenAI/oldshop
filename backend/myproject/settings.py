@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'Cart',
     'Orders',
     'Coupons',
+    'Bookings',
 ]
 
 MIDDLEWARE = [
@@ -155,6 +156,8 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser', # Enable file uploads
         'rest_framework.parsers.FormParser',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
 }
 
 # JWT Settings
@@ -213,3 +216,44 @@ OTP_RATE_LIMIT_PER_HOUR = 3
 SUPABASE_URL = config('SUPABASE_URL', default='https://jvxwbitigbwilbjwzthx.supabase.co')
 SUPABASE_KEY = config('SUPABASE_KEY', default='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2eHdiaXRpZ2J3aWxiand6dGh4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Mzk3NzIyNiwiZXhwIjoyMDc5NTUzMjI2fQ.Xrb0W1GARymUBx212R1Gz1IxTorL0Td4TkKA1s-f0k8')
 SUPABASE_AVATAR_BUCKET = config('SUPABASE_AVATAR_BUCKET', default='oldshop')
+
+# Gemini API Settings
+GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+USE_GEMINI_EMBEDDINGS = config('USE_GEMINI_EMBEDDINGS', default='False', cast=bool)
+
+# Strike API Settings (for Family payment method)
+STRIKE_API_KEY = config('STRIKE_API_KEY', default='')
+STRIKE_SECRET_KEY = config('STRIKE_SECRET_KEY', default='')
+STRIKE_WEBHOOK_SECRET = config('STRIKE_WEBHOOK_SECRET', default='')
+
+# Cache Configuration
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+    },
+}

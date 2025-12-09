@@ -59,6 +59,7 @@ export const AddressPanel: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
   const [addressForm, setAddressForm] = useState({
     recipient: '',
     postalCode: '',
@@ -78,9 +79,12 @@ export const AddressPanel: React.FC = () => {
     try {
       setIsLoading(true);
       const data = await addressService.list();
-      setAddresses(data);
+      // Handle both array and paginated response
+      const addressesArray = Array.isArray(data) ? data : (data.results || []);
+      setAddresses(addressesArray);
     } catch (error) {
       console.error('Failed to load addresses', error);
+      setAddresses([]); // Set empty array on error
     } finally {
       setIsLoading(false);
     }
@@ -122,6 +126,34 @@ export const AddressPanel: React.FC = () => {
     }
   }, [addressForm.postalCode, showForm]);
 
+  const resetForm = () => {
+    setAddressForm({
+      recipient: '',
+      postalCode: '',
+      prefecture: '東京都',
+      city: '',
+      district: '',
+      building: '',
+      phone: '',
+    });
+    setEditingAddressId(null);
+    setShowForm(false);
+  };
+
+  const handleEditAddress = (address: Address) => {
+    setEditingAddressId(address.id);
+    setAddressForm({
+      recipient: address.recipient,
+      postalCode: address.postal_code,
+      prefecture: address.prefecture,
+      city: address.city,
+      district: address.district,
+      building: address.building || '',
+      phone: address.phone || '',
+    });
+    setShowForm(true);
+  };
+
   const handleAddAddress = (e: React.FormEvent) => {
     e.preventDefault();
     const rawPostal = addressForm.postalCode.replace(/\D/g, '');
@@ -139,32 +171,28 @@ export const AddressPanel: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    addressService
-      .create({
-        recipient: addressForm.recipient.trim(),
-        postal_code: rawPostal,
-        prefecture: addressForm.prefecture,
-        city: addressForm.city.trim(),
-        district: addressForm.district.trim(),
-        building: addressForm.building.trim(),
-        phone: addressForm.phone.trim(),
-      })
+    const payload = {
+      recipient: addressForm.recipient.trim(),
+      postal_code: rawPostal,
+      prefecture: addressForm.prefecture,
+      city: addressForm.city.trim(),
+      district: addressForm.district.trim(),
+      building: addressForm.building.trim(),
+      phone: addressForm.phone.trim(),
+    };
+
+    const promise = editingAddressId
+      ? addressService.update(editingAddressId, payload)
+      : addressService.create(payload);
+
+    promise
       .then(() => {
-        setAddressForm({
-          recipient: '',
-          postalCode: '',
-          prefecture: '東京都',
-          city: '',
-          district: '',
-          building: '',
-          phone: '',
-        });
-        setShowForm(false);
+        resetForm();
         loadAddresses();
       })
       .catch((error) => {
         console.error(error);
-        alert('住所の保存に失敗しました。');
+        alert(editingAddressId ? '住所の更新に失敗しました。' : '住所の保存に失敗しました。');
       })
       .finally(() => setIsSubmitting(false));
   };
@@ -199,14 +227,18 @@ export const AddressPanel: React.FC = () => {
       <div className="space-y-4">
         {isLoading ? (
           <p className="text-gray-500 italic font-serif">住所を読み込み中...</p>
-        ) : addresses.length === 0 ? (
+        ) : !Array.isArray(addresses) || addresses.length === 0 ? (
           <p className="text-gray-500 italic font-serif">まだ住所が登録されていません。</p>
         ) : (
           <div className="space-y-4">
             {addresses.map((address) => (
               <div
                 key={address.id}
-                className="border border-amber-200 rounded-lg p-4 bg-white shadow-sm relative"
+                className={`border rounded-lg p-4 shadow-sm relative transition-all ${
+                  editingAddressId === address.id
+                    ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-200'
+                    : 'border-amber-200 bg-white'
+                }`}
               >
                 <div className="flex justify-between items-start gap-3">
                   <div>
@@ -238,6 +270,17 @@ export const AddressPanel: React.FC = () => {
                       </button>
                     )}
                     <button
+                      onClick={() => handleEditAddress(address)}
+                      disabled={editingAddressId === address.id}
+                      className={`transition-colors ${
+                        editingAddressId === address.id
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-amber-700 hover:text-amber-900'
+                      }`}
+                    >
+                      {editingAddressId === address.id ? '編集中...' : '編集'}
+                    </button>
+                    <button
                       onClick={() => handleDelete(address.id)}
                       className="text-red-600 hover:text-red-800 transition-colors"
                     >
@@ -262,21 +305,10 @@ export const AddressPanel: React.FC = () => {
         <div className="border border-amber-200 rounded-lg bg-amber-50/60 p-4 max-w-2xl">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-serif font-bold text-amber-900 uppercase tracking-[0.2em]">
-              住所を追加
+              {editingAddressId ? '住所を編集' : '住所を追加'}
             </h4>
             <button
-                      onClick={() => {
-                        setShowForm(false);
-                        setAddressForm({
-                          recipient: '',
-                          postalCode: '',
-                          prefecture: '東京都',
-                          city: '',
-                          district: '',
-                          building: '',
-                          phone: '',
-                        });
-                      }}
+              onClick={resetForm}
               className="text-xs text-amber-700 hover:text-red-600 uppercase tracking-[0.2em]"
             >
               キャンセル
@@ -403,7 +435,9 @@ export const AddressPanel: React.FC = () => {
                   isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-amber-700'
                 }`}
               >
-                {isSubmitting ? '保存中...' : '住所を保存'}
+                {isSubmitting 
+                  ? (editingAddressId ? '更新中...' : '保存中...') 
+                  : (editingAddressId ? '住所を更新' : '住所を保存')}
               </button>
             </div>
           </form>
