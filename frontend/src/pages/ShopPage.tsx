@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { ProductList } from '../components/shop/ProductList';
 import { ProductFilter } from '../components/shop/ProductFilter';
 import { AccessoriesSection } from '../components/shop/AccessoriesSection';
 import { productService } from '../services/productService';
 import type { Product, ProductFilters } from '../types/product';
+import { useAuth } from '../contexts/AuthContext';
 
 export const ShopPage: React.FC = () => {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -148,6 +150,56 @@ export const ShopPage: React.FC = () => {
           </div>
         </div>
       </main>
+
+      {/* Floating Buttons - Right bottom corner */}
+      {user && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-4">
+          {/* Free Items Button */}
+          <Link
+            to="/free-items"
+            className="group"
+            aria-label="無料あげます"
+          >
+            <div className="relative">
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-green-400 rounded-full blur-xl opacity-50 group-hover:opacity-75 transition-opacity animate-pulse"></div>
+              
+              {/* Main button */}
+              <div className="relative bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-full p-4 shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-110 hover:rotate-3">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-2xl">🎁</span>
+                  <span className="text-xs font-bold whitespace-nowrap">無料あげます</span>
+                </div>
+              </div>
+            </div>
+          </Link>
+
+          {/* AI Pricing Button */}
+          <Link
+            to="/ai-pricing"
+            className="group"
+            aria-label="AI価格設定"
+          >
+            <div className="relative">
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-blue-400 rounded-full blur-xl opacity-50 group-hover:opacity-75 transition-opacity animate-pulse"></div>
+              
+              {/* Main button */}
+              <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full p-4 shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 hover:scale-110 hover:rotate-3">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-2xl">🤖</span>
+                  <span className="text-xs font-bold whitespace-nowrap">AI価格設定</span>
+                </div>
+              </div>
+              
+              {/* Badge for new feature */}
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full border-2 border-white animate-bounce">
+                NEW
+              </div>
+            </div>
+          </Link>
+        </div>
+      )}
     </div>
   );
 };

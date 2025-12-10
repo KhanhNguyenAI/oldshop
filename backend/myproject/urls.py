@@ -27,4 +27,5 @@ urlpatterns = [
     path('api/', include('Bookings.urls')),
     path('api/', include('Core.urls')),
     path('api/', include('FreeItems.urls')),
+    path('api/ai/', include('AIPricing.urls')),
 ]

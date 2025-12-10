@@ -25,13 +25,18 @@ export const RobotAssistant: React.FC = () => {
       description: 'スクラップ買取価格一覧をご確認いただけます。金属、雑品、プラスチック、木材など、様々な種類の買取価格を掲載しています。',
       link: '/buyback-price'
     },
-    // Có thể thêm các dịch vụ khác sau này
-    // {
-    //   icon: '🔧',
-    //   title: '修理サービス',
-    //   description: '家電製品の修理サービスを提供しています。',
-    //   link: '/repair-service'
-    // },
+    {
+      icon: '🎁',
+      title: '無料あげます',
+      description: '使わないものを誰かに譲りましょう。無償譲渡・交換のコミュニティです。地球にやさしいリサイクルコミュニティ。',
+      link: '/free-items'
+    },
+    {
+      icon: '🤖',
+      title: 'AI価格設定',
+      description: 'AIが商品情報を分析し、公正な価格を提案します。日本市場の相場を参考に、買い手に有利な価格を設定します。',
+      link: '/ai-pricing'
+    },
   ], []);
 
   const faqs: FAQItem[] = [
@@ -59,6 +64,16 @@ export const RobotAssistant: React.FC = () => {
       question: "買取価格？",
       answer: "スクラップ買取価格一覧をご確認いただけます。金属、雑品、プラスチック、木材など、様々な種類の買取価格を掲載しています。",
       link: "/buyback-price"
+    },
+    {
+      question: "無料であげるサービスについて知りたいですか？",
+      answer: "使わないものを誰かに譲りましょう。無償譲渡・交換のコミュニティです。地球にやさしいリサイクルコミュニティ。家具、家電、服飾、本・雑誌、おもちゃ、スポーツ用品など、様々なアイテムを無料で譲り合えます。",
+      link: "/free-items"
+    },
+    {
+      question: "AI価格設定サービスについて知りたいですか？",
+      answer: "AIが商品情報を分析し、公正な価格を提案します。日本市場の相場（メルカリ、ヤフオクなど）を参考に、買い手に有利な価格を設定します。商品の状態、市場需要、処理コストなどを総合的に考慮して価格を決定します。",
+      link: "/ai-pricing"
     },
     {
       question: "返品・交換について知りたいですか？",

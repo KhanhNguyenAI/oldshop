@@ -21,6 +21,7 @@ import { CreateFreeItemPage } from './pages/CreateFreeItemPage';
 import { FreeItemDetailPage } from './pages/FreeItemDetailPage';
 import { MyFreeItemsPage } from './pages/MyFreeItemsPage';
 import { EditFreeItemPage } from './pages/EditFreeItemPage';
+import { AIPricingPage } from './pages/AIPricingPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PageLoader } from './components/ui/PageLoader';
 import { Footer } from './components/Footer';
@@ -91,6 +92,14 @@ const AppContent = () => {
             element={
               <ProtectedRoute>
                 <AdminPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/ai-pricing" 
+            element={
+              <ProtectedRoute>
+                <AIPricingPage />
               </ProtectedRoute>
             } 
           />

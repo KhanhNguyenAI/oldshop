@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters import rest_framework as filters
 from django.db.models import Q, Count
@@ -61,13 +61,17 @@ class FreeItemViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = FreeItem.objects.select_related('user').prefetch_related('images', 'messages')
         
+        # Admin can see all items regardless of status
+        is_admin = self.request.user.is_authenticated and (self.request.user.is_staff or self.request.user.is_superuser)
+        
         # Filter by status - mặc định chỉ hiển thị available và reserved
         status_filter = self.request.query_params.get('status', None)
         if status_filter:
             queryset = queryset.filter(status=status_filter)
         else:
             # Mặc định chỉ hiển thị available và reserved cho public
-            if not self.request.user.is_authenticated or self.action == 'list':
+            # Admin can see all statuses
+            if not is_admin and (not self.request.user.is_authenticated or self.action == 'list'):
                 queryset = queryset.filter(status__in=['available', 'reserved'])
         
         # Sort
@@ -147,23 +151,44 @@ class FreeItemViewSet(viewsets.ModelViewSet):
         serializer.save()
     
     def perform_destroy(self, instance):
-        """Chỉ cho phép owner delete"""
-        if instance.user != self.request.user:
+        """Chỉ cho phép owner hoặc admin delete"""
+        is_admin = self.request.user.is_authenticated and (self.request.user.is_staff or self.request.user.is_superuser)
+        if instance.user != self.request.user and not is_admin:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("このアイテムを削除する権限がありません。")
         instance.delete()
     
     @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated])
     def update_status(self, request, pk=None):
-        """Update status của item (chỉ owner)"""
+        """Update status của item (chỉ owner hoặc admin)"""
         item = self.get_object()
-        if item.user != request.user:
+        is_admin = request.user.is_staff or request.user.is_superuser
+        
+        if item.user != request.user and not is_admin:
             return Response(
                 {'error': 'このアイテムを編集する権限がありません。'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
         new_status = request.data.get('status')
+        if new_status not in dict(FreeItem.STATUS_CHOICES):
+            return Response(
+                {'error': '無効なステータスです。'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        item.status = new_status
+        item.save()
+        
+        serializer = self.get_serializer(item)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['patch'], permission_classes=[IsAuthenticated, IsAdminUser])
+    def admin_update_status(self, request, pk=None):
+        """Admin action to update status of a free item"""
+        item = self.get_object()
+        new_status = request.data.get('status')
+        
         if new_status not in dict(FreeItem.STATUS_CHOICES):
             return Response(
                 {'error': '無効なステータスです。'},

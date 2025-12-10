@@ -156,5 +156,21 @@ export const freeItemService = {
     const response = await api.patch(`/free-item-messages/${messageId}/mark_read/`);
     return response.data;
   },
+
+  // Admin functions
+  getAllFreeItems: async (status?: string): Promise<FreeItem[]> => {
+    const params = status ? `?status=${status}` : '';
+    const response = await api.get(`/free-items/${params}`);
+    return Array.isArray(response.data) ? response.data : (response.data.results || []);
+  },
+
+  adminUpdateStatus: async (id: string, status: string): Promise<FreeItem> => {
+    const response = await api.patch(`/free-items/${id}/admin_update_status/`, { status });
+    return response.data;
+  },
+
+  adminDelete: async (id: string): Promise<void> => {
+    await api.delete(`/free-items/${id}/`);
+  },
 };
 

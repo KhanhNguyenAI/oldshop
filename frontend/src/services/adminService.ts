@@ -39,6 +39,42 @@ export interface DashboardStats {
     today: number;
     week: number;
   };
+  ai_pricing: {
+    total: number;
+    pending: number;
+    priced: number;
+    error: number;
+    today: number;
+    week: number;
+    month: number;
+    recent: Array<{
+      id: string;
+      title: string;
+      category: string;
+      status: string;
+      suggested_price: string | null;
+      created_at: string;
+      user__email: string;
+    }>;
+  };
+  free_items: {
+    total: number;
+    available: number;
+    reserved: number;
+    completed: number;
+    today: number;
+    week: number;
+    month: number;
+    recent: Array<{
+      id: string;
+      title: string;
+      category: string;
+      status: string;
+      location_prefecture: string;
+      created_at: string;
+      user__email: string;
+    }>;
+  };
 }
 
 export interface Contact {

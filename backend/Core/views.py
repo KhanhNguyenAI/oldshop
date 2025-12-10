@@ -13,6 +13,8 @@ from .models import Contact
 from .serializers import ContactSerializer, ContactAdminSerializer
 from Orders.models import Order
 from Bookings.models import Booking
+from AIPricing.models import PricingRequest
+from FreeItems.models import FreeItem
 
 class ContactRateThrottle(AnonRateThrottle):
     rate = '3/day'
@@ -141,6 +143,24 @@ def admin_dashboard_stats(request):
     today_inquiries = Contact.objects.filter(created_at__date=today).count()
     week_inquiries = Contact.objects.filter(created_at__date__gte=week_ago).count()
     
+    # AI Pricing stats
+    total_pricing_requests = PricingRequest.objects.count()
+    pending_pricing = PricingRequest.objects.filter(status='pending').count()
+    priced_requests = PricingRequest.objects.filter(status='priced').count()
+    error_pricing = PricingRequest.objects.filter(status='error').count()
+    today_pricing = PricingRequest.objects.filter(created_at__date=today).count()
+    week_pricing = PricingRequest.objects.filter(created_at__date__gte=week_ago).count()
+    month_pricing = PricingRequest.objects.filter(created_at__date__gte=month_ago).count()
+    
+    # Free Items stats
+    total_free_items = FreeItem.objects.count()
+    available_items = FreeItem.objects.filter(status='available').count()
+    reserved_items = FreeItem.objects.filter(status='reserved').count()
+    completed_items = FreeItem.objects.filter(status='completed').count()
+    today_free_items = FreeItem.objects.filter(created_at__date=today).count()
+    week_free_items = FreeItem.objects.filter(created_at__date__gte=week_ago).count()
+    month_free_items = FreeItem.objects.filter(created_at__date__gte=month_ago).count()
+    
     # Recent orders (last 10)
     recent_orders = Order.objects.order_by('-created_at')[:10].values(
         'id', 'total_amount', 'status', 'payment_method', 'created_at', 'full_name'
@@ -149,6 +169,16 @@ def admin_dashboard_stats(request):
     # Recent bookings (last 10)
     recent_bookings = Booking.objects.order_by('-created_at')[:10].values(
         'id', 'customer_name', 'booking_date', 'status', 'total_price', 'created_at'
+    )
+    
+    # Recent pricing requests (last 10)
+    recent_pricing = PricingRequest.objects.order_by('-created_at')[:10].values(
+        'id', 'title', 'category', 'status', 'suggested_price', 'created_at', 'user__email'
+    )
+    
+    # Recent free items (last 10)
+    recent_free_items = FreeItem.objects.order_by('-created_at')[:10].values(
+        'id', 'title', 'category', 'status', 'location_prefecture', 'created_at', 'user__email'
     )
     
     return Response({
@@ -175,5 +205,25 @@ def admin_dashboard_stats(request):
             'unresolved': unresolved_inquiries,
             'today': today_inquiries,
             'week': week_inquiries
+        },
+        'ai_pricing': {
+            'total': total_pricing_requests,
+            'pending': pending_pricing,
+            'priced': priced_requests,
+            'error': error_pricing,
+            'today': today_pricing,
+            'week': week_pricing,
+            'month': month_pricing,
+            'recent': list(recent_pricing)
+        },
+        'free_items': {
+            'total': total_free_items,
+            'available': available_items,
+            'reserved': reserved_items,
+            'completed': completed_items,
+            'today': today_free_items,
+            'week': week_free_items,
+            'month': month_free_items,
+            'recent': list(recent_free_items)
         }
     })

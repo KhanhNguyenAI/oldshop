@@ -4,13 +4,17 @@ import { useAuth } from '../contexts/AuthContext';
 import { adminService, type DashboardStats, type Contact } from '../services/adminService';
 import { orderService } from '../services/orderService';
 import { bookingService } from '../services/bookingService';
+import { pricingService } from '../services/pricingService';
+import { freeItemService } from '../services/freeItemService';
 import api from '../services/api';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import type { Order } from '../types/order';
 import type { Booking } from '../types/booking';
+import type { PricingRequest } from '../types/pricing';
+import type { FreeItem } from '../types/freeItem';
 
-type Tab = 'dashboard' | 'orders' | 'bookings' | 'inquiries';
+type Tab = 'dashboard' | 'orders' | 'bookings' | 'inquiries' | 'ai_pricing' | 'free_items';
 
 export const AdminPage: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
@@ -21,6 +25,8 @@ export const AdminPage: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [inquiries, setInquiries] = useState<Contact[]>([]);
+  const [pricingRequests, setPricingRequests] = useState<PricingRequest[]>([]);
+  const [freeItems, setFreeItems] = useState<FreeItem[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<Contact | null>(null);
   const [replyText, setReplyText] = useState('');
 
@@ -57,6 +63,12 @@ export const AdminPage: React.FC = () => {
         const inquiriesData = await adminService.getContacts();
         // adminService.getContacts already handles pagination and returns array
         setInquiries(Array.isArray(inquiriesData) ? inquiriesData : []);
+      } else if (activeTab === 'ai_pricing') {
+        const pricingData = await pricingService.getAllPricingRequests();
+        setPricingRequests(Array.isArray(pricingData) ? pricingData : (pricingData?.results || []));
+      } else if (activeTab === 'free_items') {
+        const freeItemsData = await freeItemService.getAllFreeItems();
+        setFreeItems(Array.isArray(freeItemsData) ? freeItemsData : (freeItemsData?.results || []));
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -134,12 +146,12 @@ export const AdminPage: React.FC = () => {
       {/* Tabs */}
       <div className="relative z-10 bg-white/80 backdrop-blur-sm border-b-4 border-amber-800 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-2">
-            {(['dashboard', 'orders', 'bookings', 'inquiries'] as Tab[]).map((tab) => (
+          <div className="flex space-x-2 overflow-x-auto">
+            {(['dashboard', 'orders', 'bookings', 'inquiries', 'ai_pricing', 'free_items'] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-6 py-4 font-serif font-bold text-sm transition-all relative ${
+                className={`px-6 py-4 font-serif font-bold text-sm transition-all relative whitespace-nowrap ${
                   activeTab === tab
                     ? 'text-amber-900 bg-amber-50 border-b-4 border-amber-800 shadow-[0_2px_4px_rgba(0,0,0,0.1)]'
                     : 'text-stone-600 hover:text-amber-900 hover:bg-amber-50/50'
@@ -149,6 +161,8 @@ export const AdminPage: React.FC = () => {
                 {tab === 'orders' && '📦 注文管理'}
                 {tab === 'bookings' && '📅 予約管理'}
                 {tab === 'inquiries' && '💬 お問い合わせ'}
+                {tab === 'ai_pricing' && '🤖 AI価格設定'}
+                {tab === 'free_items' && '🎁 無料あげます'}
                 {activeTab === tab && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600"></div>
                 )}
@@ -187,6 +201,21 @@ export const AdminPage: React.FC = () => {
                 onUpdate={loadData}
               />
             )}
+            {activeTab === 'ai_pricing' && (
+              <AIPricingTab
+                requests={pricingRequests}
+                formatPrice={formatPrice}
+                formatDate={formatDate}
+                onUpdate={loadData}
+              />
+            )}
+            {activeTab === 'free_items' && (
+              <FreeItemsTab
+                items={freeItems}
+                formatDate={formatDate}
+                onUpdate={loadData}
+              />
+            )}
           </>
         )}
       </div>
@@ -203,7 +232,7 @@ const DashboardTab: React.FC<{
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
         <div className="bg-white/90 backdrop-blur-sm p-6 rounded-sm border-4 border-amber-800 shadow-[4px_4px_0px_0px_rgba(120,53,15,0.3)] hover:shadow-[6px_6px_0px_0px_rgba(120,53,15,0.3)] transition-all">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center text-2xl border-2 border-amber-800">
@@ -233,6 +262,26 @@ const DashboardTab: React.FC<{
           </div>
           <p className="text-4xl font-serif font-bold text-red-700">{stats.inquiries.unresolved}</p>
           <p className="text-sm text-amber-700 mt-2 font-serif italic">総数: {stats.inquiries.total}件</p>
+        </div>
+        <div className="bg-white/90 backdrop-blur-sm p-6 rounded-sm border-4 border-blue-800 shadow-[4px_4px_0px_0px_rgba(30,58,138,0.3)] hover:shadow-[6px_6px_0px_0px_rgba(30,58,138,0.3)] transition-all">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl border-2 border-blue-800">
+              🤖
+            </div>
+            <h3 className="text-sm font-serif font-bold text-blue-900 uppercase tracking-wide">AI価格設定</h3>
+          </div>
+          <p className="text-4xl font-serif font-bold text-blue-700">{stats.ai_pricing.total}</p>
+          <p className="text-sm text-blue-700 mt-2 font-serif italic">今月: {stats.ai_pricing.month}件</p>
+        </div>
+        <div className="bg-white/90 backdrop-blur-sm p-6 rounded-sm border-4 border-purple-800 shadow-[4px_4px_0px_0px_rgba(107,33,168,0.3)] hover:shadow-[6px_6px_0px_0px_rgba(107,33,168,0.3)] transition-all">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-2xl border-2 border-purple-800">
+              🎁
+            </div>
+            <h3 className="text-sm font-serif font-bold text-purple-900 uppercase tracking-wide">無料あげます</h3>
+          </div>
+          <p className="text-4xl font-serif font-bold text-purple-700">{stats.free_items.total}</p>
+          <p className="text-sm text-purple-700 mt-2 font-serif italic">今月: {stats.free_items.month}件</p>
         </div>
       </div>
 
@@ -274,6 +323,126 @@ const DashboardTab: React.FC<{
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* AI Pricing & Free Items Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* AI Pricing Stats */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-sm border-4 border-blue-800 shadow-[4px_4px_0px_0px_rgba(30,58,138,0.3)]">
+          <div className="p-6 border-b-4 border-blue-800 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <h2 className="text-xl font-serif font-bold text-blue-900 tracking-wide">🤖 AI価格設定 統計</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-blue-50/50 p-4 rounded-sm border-2 border-blue-200">
+                <p className="text-xs font-serif font-bold text-blue-700 uppercase tracking-wide mb-1">総リクエスト</p>
+                <p className="text-3xl font-serif font-bold text-blue-900">{stats.ai_pricing.total}</p>
+              </div>
+              <div className="bg-green-50/50 p-4 rounded-sm border-2 border-green-200">
+                <p className="text-xs font-serif font-bold text-green-700 uppercase tracking-wide mb-1">完了</p>
+                <p className="text-3xl font-serif font-bold text-green-900">{stats.ai_pricing.priced}</p>
+              </div>
+              <div className="bg-yellow-50/50 p-4 rounded-sm border-2 border-yellow-200">
+                <p className="text-xs font-serif font-bold text-yellow-700 uppercase tracking-wide mb-1">処理中</p>
+                <p className="text-3xl font-serif font-bold text-yellow-900">{stats.ai_pricing.pending}</p>
+              </div>
+              <div className="bg-red-50/50 p-4 rounded-sm border-2 border-red-200">
+                <p className="text-xs font-serif font-bold text-red-700 uppercase tracking-wide mb-1">エラー</p>
+                <p className="text-3xl font-serif font-bold text-red-900">{stats.ai_pricing.error}</p>
+              </div>
+            </div>
+            <div className="border-t-2 border-blue-200 pt-4">
+              <h3 className="text-sm font-serif font-bold text-blue-900 mb-3">最近のリクエスト</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {stats.ai_pricing.recent.length > 0 ? (
+                  stats.ai_pricing.recent.map((request) => (
+                    <div key={request.id} className="bg-blue-50/30 p-3 rounded-sm border border-blue-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-serif font-bold text-blue-900">{request.title}</p>
+                          <p className="text-xs text-blue-700 font-serif">{request.category}</p>
+                        </div>
+                        <span className={`px-2 py-1 rounded-sm text-xs font-serif font-bold border ${
+                          request.status === 'priced' ? 'bg-green-100 text-green-900 border-green-800' :
+                          request.status === 'pending' ? 'bg-yellow-100 text-yellow-900 border-yellow-800' :
+                          'bg-red-100 text-red-900 border-red-800'
+                        }`}>
+                          {request.status === 'priced' ? '完了' : request.status === 'pending' ? '処理中' : 'エラー'}
+                        </span>
+                      </div>
+                      {request.suggested_price && (
+                        <p className="text-xs text-blue-600 font-serif mt-1">
+                          提案価格: {formatPrice(request.suggested_price)}
+                        </p>
+                      )}
+                      <p className="text-xs text-blue-500 font-serif mt-1">{formatDate(request.created_at)}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-blue-600 font-serif text-center py-4">リクエストがありません</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Free Items Stats */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-sm border-4 border-purple-800 shadow-[4px_4px_0px_0px_rgba(107,33,168,0.3)]">
+          <div className="p-6 border-b-4 border-purple-800 bg-gradient-to-r from-purple-50 to-pink-50">
+            <h2 className="text-xl font-serif font-bold text-purple-900 tracking-wide">🎁 無料あげます 統計</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-purple-50/50 p-4 rounded-sm border-2 border-purple-200">
+                <p className="text-xs font-serif font-bold text-purple-700 uppercase tracking-wide mb-1">総アイテム</p>
+                <p className="text-3xl font-serif font-bold text-purple-900">{stats.free_items.total}</p>
+              </div>
+              <div className="bg-green-50/50 p-4 rounded-sm border-2 border-green-200">
+                <p className="text-xs font-serif font-bold text-green-700 uppercase tracking-wide mb-1">募集中</p>
+                <p className="text-3xl font-serif font-bold text-green-900">{stats.free_items.available}</p>
+              </div>
+              <div className="bg-yellow-50/50 p-4 rounded-sm border-2 border-yellow-200">
+                <p className="text-xs font-serif font-bold text-yellow-700 uppercase tracking-wide mb-1">相談中</p>
+                <p className="text-3xl font-serif font-bold text-yellow-900">{stats.free_items.reserved}</p>
+              </div>
+              <div className="bg-blue-50/50 p-4 rounded-sm border-2 border-blue-200">
+                <p className="text-xs font-serif font-bold text-blue-700 uppercase tracking-wide mb-1">終了</p>
+                <p className="text-3xl font-serif font-bold text-blue-900">{stats.free_items.completed}</p>
+              </div>
+            </div>
+            <div className="border-t-2 border-purple-200 pt-4">
+              <h3 className="text-sm font-serif font-bold text-purple-900 mb-3">最近のアイテム</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {stats.free_items.recent.length > 0 ? (
+                  stats.free_items.recent.map((item) => (
+                    <div key={item.id} className="bg-purple-50/30 p-3 rounded-sm border border-purple-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-serif font-bold text-purple-900">{item.title}</p>
+                          <p className="text-xs text-purple-700 font-serif">{item.category || 'カテゴリなし'}</p>
+                          <p className="text-xs text-purple-600 font-serif">{item.location_prefecture}</p>
+                        </div>
+                        <span className={`px-2 py-1 rounded-sm text-xs font-serif font-bold border ${
+                          item.status === 'available' ? 'bg-green-100 text-green-900 border-green-800' :
+                          item.status === 'reserved' ? 'bg-yellow-100 text-yellow-900 border-yellow-800' :
+                          item.status === 'completed' ? 'bg-blue-100 text-blue-900 border-blue-800' :
+                          'bg-red-100 text-red-900 border-red-800'
+                        }`}>
+                          {item.status === 'available' ? '募集中' :
+                           item.status === 'reserved' ? '相談中' :
+                           item.status === 'completed' ? '終了' : 'キャンセル'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-purple-500 font-serif mt-1">{formatDate(item.created_at)}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-purple-600 font-serif text-center py-4">アイテムがありません</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -676,6 +845,410 @@ const InquiriesTab: React.FC<{
             <p className="font-serif text-lg">お問い合わせを選択してください</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+// AI Pricing Tab Component
+const AIPricingTab: React.FC<{
+  requests: PricingRequest[];
+  formatPrice: (price: number | string) => string;
+  formatDate: (date: string) => string;
+  onUpdate: () => void;
+}> = ({ requests, formatPrice, formatDate, onUpdate }) => {
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'priced' | 'error' | 'rejected'>('all');
+
+  const handleUpdateStatus = async (requestId: string, newStatus: string) => {
+    try {
+      await pricingService.adminUpdateStatus(requestId, newStatus);
+      toast.success('ステータスを更新しました');
+      onUpdate();
+    } catch (error) {
+      console.error('Error updating pricing request status:', error);
+      toast.error('更新に失敗しました');
+    }
+  };
+
+  const handleDelete = async (requestId: string) => {
+    if (!confirm('このリクエストを削除してもよろしいですか？')) {
+      return;
+    }
+    try {
+      await pricingService.adminDelete(requestId);
+      toast.success('削除しました');
+      onUpdate();
+    } catch (error) {
+      console.error('Error deleting pricing request:', error);
+      toast.error('削除に失敗しました');
+    }
+  };
+
+  const filteredRequests = React.useMemo(() => {
+    if (filterStatus === 'all') {
+      return requests;
+    }
+    return requests.filter(request => request.status === filterStatus);
+  }, [requests, filterStatus]);
+
+  const statusCounts = React.useMemo(() => {
+    return {
+      all: requests.length,
+      pending: requests.filter(r => r.status === 'pending').length,
+      priced: requests.filter(r => r.status === 'priced').length,
+      error: requests.filter(r => r.status === 'error').length,
+      rejected: requests.filter(r => r.status === 'rejected').length,
+    };
+  }, [requests]);
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'pending': '処理中',
+      'validated': '検証済み',
+      'priced': '完了',
+      'error': 'エラー',
+      'rejected': '拒否',
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      'pending': 'bg-yellow-100 text-yellow-900 border-yellow-800',
+      'validated': 'bg-blue-100 text-blue-900 border-blue-800',
+      'priced': 'bg-green-100 text-green-900 border-green-800',
+      'error': 'bg-red-100 text-red-900 border-red-800',
+      'rejected': 'bg-gray-100 text-gray-900 border-gray-800',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-900 border-gray-800';
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white/90 backdrop-blur-sm rounded-sm border-4 border-blue-800 shadow-[4px_4px_0px_0px_rgba(30,58,138,0.3)]">
+        <div className="flex border-b-4 border-blue-800 overflow-x-auto">
+          <button
+            onClick={() => setFilterStatus('all')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'all'
+                ? 'border-b-4 border-blue-800 text-blue-900 bg-gradient-to-b from-blue-50 to-indigo-50 shadow-inner'
+                : 'text-stone-600 hover:text-blue-900 hover:bg-blue-50/50'
+            }`}
+          >
+            すべて ({statusCounts.all})
+          </button>
+          <button
+            onClick={() => setFilterStatus('pending')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'pending'
+                ? 'border-b-4 border-yellow-800 text-yellow-900 bg-gradient-to-b from-yellow-50 to-orange-50 shadow-inner'
+                : 'text-stone-600 hover:text-yellow-900 hover:bg-yellow-50/50'
+            }`}
+          >
+            処理中 ({statusCounts.pending})
+          </button>
+          <button
+            onClick={() => setFilterStatus('priced')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'priced'
+                ? 'border-b-4 border-green-800 text-green-900 bg-gradient-to-b from-green-50 to-emerald-50 shadow-inner'
+                : 'text-stone-600 hover:text-green-900 hover:bg-green-50/50'
+            }`}
+          >
+            完了 ({statusCounts.priced})
+          </button>
+          <button
+            onClick={() => setFilterStatus('error')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'error'
+                ? 'border-b-4 border-red-800 text-red-900 bg-gradient-to-b from-red-50 to-rose-50 shadow-inner'
+                : 'text-stone-600 hover:text-red-900 hover:bg-red-50/50'
+            }`}
+          >
+            エラー ({statusCounts.error})
+          </button>
+          <button
+            onClick={() => setFilterStatus('rejected')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'rejected'
+                ? 'border-b-4 border-gray-800 text-gray-900 bg-gradient-to-b from-gray-50 to-slate-50 shadow-inner'
+                : 'text-stone-600 hover:text-gray-900 hover:bg-gray-50/50'
+            }`}
+          >
+            拒否 ({statusCounts.rejected})
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white/90 backdrop-blur-sm rounded-sm border-4 border-blue-800 shadow-[4px_4px_0px_0px_rgba(30,58,138,0.3)]">
+        <div className="p-6 border-b-4 border-blue-800 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <h2 className="text-xl font-serif font-bold text-blue-900 tracking-wide">
+            🤖 AI価格設定リクエスト ({filteredRequests.length})
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          {filteredRequests.length > 0 ? (
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-blue-100 to-indigo-100 border-b-2 border-blue-800">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-blue-900 uppercase tracking-wider">ID</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-blue-900 uppercase tracking-wider">製品名</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-blue-900 uppercase tracking-wider">カテゴリ</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-blue-900 uppercase tracking-wider">提案価格</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-blue-900 uppercase tracking-wider">ステータス</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-blue-900 uppercase tracking-wider">作成日時</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-blue-900 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y-2 divide-blue-200">
+                {filteredRequests.map((request) => (
+                  <tr key={request.id} className="hover:bg-blue-50/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-mono font-bold text-blue-900">#{request.id.slice(0, 8)}</td>
+                    <td className="px-6 py-4 text-sm font-serif text-blue-800">{request.title}</td>
+                    <td className="px-6 py-4 text-sm font-serif text-blue-700">{request.category}</td>
+                    <td className="px-6 py-4 text-sm font-serif font-bold text-green-700">
+                      {request.suggested_price ? formatPrice(request.suggested_price) : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`px-3 py-1 rounded-sm text-xs font-serif font-bold border-2 ${getStatusColor(request.status)}`}>
+                        {getStatusLabel(request.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-blue-700 font-serif">{formatDate(request.created_at)}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <div className="flex gap-2">
+                        <select
+                          value={request.status}
+                          onChange={(e) => handleUpdateStatus(request.id, e.target.value)}
+                          className="text-xs border-2 border-blue-800 rounded-sm px-2 py-1 font-serif font-bold bg-white hover:bg-blue-50 transition-colors"
+                          title="ステータスを変更"
+                        >
+                          <option value="pending">処理中</option>
+                          <option value="validated">検証済み</option>
+                          <option value="priced">完了</option>
+                          <option value="error">エラー</option>
+                          <option value="rejected">拒否</option>
+                        </select>
+                        <button
+                          onClick={() => handleDelete(request.id)}
+                          className="px-3 py-1 bg-red-100 text-red-900 text-xs rounded-sm border-2 border-red-800 font-serif font-bold hover:bg-red-200 transition-colors"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-12 text-center text-blue-700">
+              <span className="text-5xl block mb-4">🤖</span>
+              <p className="font-serif text-lg">該当するリクエストがありません</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Free Items Tab Component
+const FreeItemsTab: React.FC<{
+  items: FreeItem[];
+  formatDate: (date: string) => string;
+  onUpdate: () => void;
+}> = ({ items, formatDate, onUpdate }) => {
+  const [filterStatus, setFilterStatus] = useState<'all' | 'available' | 'reserved' | 'completed' | 'cancelled'>('all');
+
+  const handleUpdateStatus = async (itemId: string, newStatus: string) => {
+    try {
+      await freeItemService.adminUpdateStatus(itemId, newStatus);
+      toast.success('ステータスを更新しました');
+      onUpdate();
+    } catch (error) {
+      console.error('Error updating free item status:', error);
+      toast.error('更新に失敗しました');
+    }
+  };
+
+  const handleDelete = async (itemId: string) => {
+    if (!confirm('このアイテムを削除してもよろしいですか？')) {
+      return;
+    }
+    try {
+      await freeItemService.adminDelete(itemId);
+      toast.success('削除しました');
+      onUpdate();
+    } catch (error) {
+      console.error('Error deleting free item:', error);
+      toast.error('削除に失敗しました');
+    }
+  };
+
+  const filteredItems = React.useMemo(() => {
+    if (filterStatus === 'all') {
+      return items;
+    }
+    return items.filter(item => item.status === filterStatus);
+  }, [items, filterStatus]);
+
+  const statusCounts = React.useMemo(() => {
+    return {
+      all: items.length,
+      available: items.filter(i => i.status === 'available').length,
+      reserved: items.filter(i => i.status === 'reserved').length,
+      completed: items.filter(i => i.status === 'completed').length,
+      cancelled: items.filter(i => i.status === 'cancelled').length,
+    };
+  }, [items]);
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'available': '募集中',
+      'reserved': '相談中',
+      'completed': '終了',
+      'cancelled': 'キャンセル',
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      'available': 'bg-green-100 text-green-900 border-green-800',
+      'reserved': 'bg-yellow-100 text-yellow-900 border-yellow-800',
+      'completed': 'bg-blue-100 text-blue-900 border-blue-800',
+      'cancelled': 'bg-red-100 text-red-900 border-red-800',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-900 border-gray-800';
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white/90 backdrop-blur-sm rounded-sm border-4 border-purple-800 shadow-[4px_4px_0px_0px_rgba(107,33,168,0.3)]">
+        <div className="flex border-b-4 border-purple-800 overflow-x-auto">
+          <button
+            onClick={() => setFilterStatus('all')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'all'
+                ? 'border-b-4 border-purple-800 text-purple-900 bg-gradient-to-b from-purple-50 to-pink-50 shadow-inner'
+                : 'text-stone-600 hover:text-purple-900 hover:bg-purple-50/50'
+            }`}
+          >
+            すべて ({statusCounts.all})
+          </button>
+          <button
+            onClick={() => setFilterStatus('available')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'available'
+                ? 'border-b-4 border-green-800 text-green-900 bg-gradient-to-b from-green-50 to-emerald-50 shadow-inner'
+                : 'text-stone-600 hover:text-green-900 hover:bg-green-50/50'
+            }`}
+          >
+            募集中 ({statusCounts.available})
+          </button>
+          <button
+            onClick={() => setFilterStatus('reserved')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'reserved'
+                ? 'border-b-4 border-yellow-800 text-yellow-900 bg-gradient-to-b from-yellow-50 to-orange-50 shadow-inner'
+                : 'text-stone-600 hover:text-yellow-900 hover:bg-yellow-50/50'
+            }`}
+          >
+            相談中 ({statusCounts.reserved})
+          </button>
+          <button
+            onClick={() => setFilterStatus('completed')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'completed'
+                ? 'border-b-4 border-blue-800 text-blue-900 bg-gradient-to-b from-blue-50 to-indigo-50 shadow-inner'
+                : 'text-stone-600 hover:text-blue-900 hover:bg-blue-50/50'
+            }`}
+          >
+            終了 ({statusCounts.completed})
+          </button>
+          <button
+            onClick={() => setFilterStatus('cancelled')}
+            className={`px-6 py-4 font-serif font-bold text-sm transition-all whitespace-nowrap ${
+              filterStatus === 'cancelled'
+                ? 'border-b-4 border-red-800 text-red-900 bg-gradient-to-b from-red-50 to-rose-50 shadow-inner'
+                : 'text-stone-600 hover:text-red-900 hover:bg-red-50/50'
+            }`}
+          >
+            キャンセル ({statusCounts.cancelled})
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white/90 backdrop-blur-sm rounded-sm border-4 border-purple-800 shadow-[4px_4px_0px_0px_rgba(107,33,168,0.3)]">
+        <div className="p-6 border-b-4 border-purple-800 bg-gradient-to-r from-purple-50 to-pink-50">
+          <h2 className="text-xl font-serif font-bold text-purple-900 tracking-wide">
+            🎁 無料アイテム ({filteredItems.length})
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          {filteredItems.length > 0 ? (
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-purple-100 to-pink-100 border-b-2 border-purple-800">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-purple-900 uppercase tracking-wider">ID</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-purple-900 uppercase tracking-wider">タイトル</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-purple-900 uppercase tracking-wider">カテゴリ</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-purple-900 uppercase tracking-wider">場所</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-purple-900 uppercase tracking-wider">閲覧数</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-purple-900 uppercase tracking-wider">ステータス</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-purple-900 uppercase tracking-wider">作成日時</th>
+                  <th className="px-6 py-4 text-left text-xs font-serif font-bold text-purple-900 uppercase tracking-wider">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y-2 divide-purple-200">
+                {filteredItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-purple-50/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-mono font-bold text-purple-900">#{item.id.slice(0, 8)}</td>
+                    <td className="px-6 py-4 text-sm font-serif text-purple-800">{item.title}</td>
+                    <td className="px-6 py-4 text-sm font-serif text-purple-700">{item.category || '-'}</td>
+                    <td className="px-6 py-4 text-sm font-serif text-purple-700">
+                      {item.location_prefecture} {item.location_city}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-serif text-purple-700">{item.views_count}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className={`px-3 py-1 rounded-sm text-xs font-serif font-bold border-2 ${getStatusColor(item.status)}`}>
+                        {getStatusLabel(item.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-purple-700 font-serif">{formatDate(item.created_at)}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <div className="flex gap-2">
+                        <select
+                          value={item.status}
+                          onChange={(e) => handleUpdateStatus(item.id, e.target.value)}
+                          className="text-xs border-2 border-purple-800 rounded-sm px-2 py-1 font-serif font-bold bg-white hover:bg-purple-50 transition-colors"
+                          title="ステータスを変更"
+                        >
+                          <option value="available">募集中</option>
+                          <option value="reserved">相談中</option>
+                          <option value="completed">終了</option>
+                          <option value="cancelled">キャンセル</option>
+                        </select>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="px-3 py-1 bg-red-100 text-red-900 text-xs rounded-sm border-2 border-red-800 font-serif font-bold hover:bg-red-200 transition-colors"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-12 text-center text-purple-700">
+              <span className="text-5xl block mb-4">🎁</span>
+              <p className="font-serif text-lg">該当するアイテムがありません</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
