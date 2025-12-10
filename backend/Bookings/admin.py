@@ -34,3 +34,6 @@ class BookingAdmin(admin.ModelAdmin):
 
 
 
+
+
+

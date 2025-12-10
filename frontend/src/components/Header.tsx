@@ -19,6 +19,7 @@ export const Header: React.FC = () => {
   const navItems = [
     { label: 'ホーム', path: '/' },
     { label: '商品一覧', path: '/shop' },
+    { label: '無料あげます', path: '/free-items' },
     { label: '予約', path: '/booking' },
     { label: '概要', path: '/about' },
     { label: 'お問い合わせ', path: '/contact' },

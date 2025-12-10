@@ -11,6 +11,7 @@ import { OrdersPanel } from '../components/profile/OrdersPanel';
 import { ReturnsPanel } from '../components/profile/ReturnsPanel';
 import CouponsPanel from '../components/profile/CouponsPanel';
 import { BookingsPanel } from '../components/profile/BookingsPanel';
+import { FreeItemsPanel } from '../components/profile/FreeItemsPanel';
 
 export const ProfilePage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -20,7 +21,7 @@ export const ProfilePage: React.FC = () => {
 
   // Update activeTab when tab query parameter changes
   useEffect(() => {
-    if (tabParam && ['profile', 'banking', 'address', 'security', 'orders', 'returns', 'coupons', 'bookings'].includes(tabParam)) {
+    if (tabParam && ['profile', 'banking', 'address', 'security', 'orders', 'returns', 'coupons', 'bookings', 'freeitems'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam]);
@@ -49,6 +50,8 @@ export const ProfilePage: React.FC = () => {
         return <CouponsPanel />;
       case 'bookings':
         return <BookingsPanel />;
+      case 'freeitems':
+        return <FreeItemsPanel />;
       default:
         return null;
     }

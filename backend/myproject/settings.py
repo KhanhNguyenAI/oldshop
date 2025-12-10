@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'Orders',
     'Coupons',
     'Bookings',
+    'FreeItems',
 ]
 
 MIDDLEWARE = [

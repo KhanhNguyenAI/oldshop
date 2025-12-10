@@ -16,6 +16,11 @@ import { ProfilePage } from './pages/ProfilePage';
 import { BookingPage } from './pages/BookingPage';
 import { BuybackPricePage } from './pages/BuybackPricePage';
 import { AdminPage } from './pages/AdminPage';
+import { FreeItemsPage } from './pages/FreeItemsPage';
+import { CreateFreeItemPage } from './pages/CreateFreeItemPage';
+import { FreeItemDetailPage } from './pages/FreeItemDetailPage';
+import { MyFreeItemsPage } from './pages/MyFreeItemsPage';
+import { EditFreeItemPage } from './pages/EditFreeItemPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PageLoader } from './components/ui/PageLoader';
 import { Footer } from './components/Footer';
@@ -41,6 +46,32 @@ const AppContent = () => {
           <Route path="/shop" element={<ShopPage />} />
           <Route path="/booking" element={<BookingPage />} />
           <Route path="/buyback-price" element={<BuybackPricePage />} />
+          <Route path="/free-items" element={<FreeItemsPage />} />
+          <Route 
+            path="/free-items/create" 
+            element={
+              <ProtectedRoute>
+                <CreateFreeItemPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route path="/free-items/:id" element={<FreeItemDetailPage />} />
+          <Route 
+            path="/free-items/:id/edit" 
+            element={
+              <ProtectedRoute>
+                <EditFreeItemPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/free-items/my-items" 
+            element={
+              <ProtectedRoute>
+                <MyFreeItemsPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="/products/:id" element={<ProductDetailPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />

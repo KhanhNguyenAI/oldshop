@@ -157,14 +157,30 @@ def confirm_family_payment_with_customer(payment_intent_id: str, customer_name: 
         payment_method_data = {
             'type': 'konbini',
         }
-        
-        # Add customer information if available
+
+        # Stripe's confirm endpoint for PaymentIntents running the default API
+        # version used by this account does not accept a top-level `customer`
+        # parameter (it raised "Received unknown parameter: customer"). To keep
+        # the customer association while avoiding that error, update the
+        # PaymentIntent first, then confirm with only the allowed fields.
+        if customer_id:
+            stripe.PaymentIntent.modify(
+                payment_intent_id,
+                customer=customer_id,
+            )
+
+        # Add billing details so konbini receipts are sent correctly
+        billing_details = {}
+        if customer_email:
+            billing_details['email'] = customer_email
+        if customer_name:
+            billing_details['name'] = customer_name
+        if billing_details:
+            payment_method_data['billing_details'] = billing_details
+
         confirm_params = {
             'payment_method_data': payment_method_data,
         }
-        
-        if customer_id:
-            confirm_params['customer'] = customer_id
         
         # Confirm the payment intent
         payment_intent = stripe.PaymentIntent.confirm(
