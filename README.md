@@ -25,7 +25,7 @@ The project was initiated to practice real-world development workflows, includin
 
 👥 Team
 
-This project was developed by 5 university students working collaboratively.
+This project was developed by 3 university students working collaboratively.
 
 Unlike many projects, we did not divide fixed roles.
 All members participated in the entire development lifecycle, including:
