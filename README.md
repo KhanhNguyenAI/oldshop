@@ -5,7 +5,7 @@ This project was developed as a collaborative student project to improve practic
 
 ## 🎥 Project Demo
 
-[![Watch the video](https://img.youtube.com/vi/u6LGtVI7K2o/maxresdefault.jpg)](https://youtu.be/u6LGtVI7K2o)
+[![Watch the video](https://img.youtube.com/vi/u6LGtVI7K2o/maxresdefault.jpg)](https://youtu.be/Dmjm2zD8AGI)
 
 📖 Overview
 
